@@ -5,6 +5,41 @@ use std::sync::Arc;
 use crate::device::DeviceContext;
 use crate::utils::find_memorytype_index;
 
+/// Defines the type and usage of a texture
+#[derive(Debug, Clone, Copy)]
+pub enum TextureType {
+    /// Depth/stencil attachment
+    Depth,
+    /// Color/color attachment texture
+    Color,
+    /// Storage/compute texture
+    Storage,
+    /// Sampled texture (read-only)
+    Sampled,
+}
+
+impl TextureType {
+    /// Get the Vulkan image usage flags for this texture type
+    fn usage_flags(&self) -> vk::ImageUsageFlags {
+        match self {
+            TextureType::Depth => vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            TextureType::Color => vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
+            TextureType::Storage => vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_DST,
+            TextureType::Sampled => vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+        }
+    }
+
+    /// Get the image aspect flags for this texture type
+    fn aspect_flags(&self) -> vk::ImageAspectFlags {
+        match self {
+            TextureType::Depth => vk::ImageAspectFlags::DEPTH,
+            TextureType::Color => vk::ImageAspectFlags::COLOR,
+            TextureType::Storage => vk::ImageAspectFlags::COLOR,
+            TextureType::Sampled => vk::ImageAspectFlags::COLOR,
+        }
+    }
+}
+
 pub struct Texture {
     ctx: Arc<DeviceContext>,
     pub image: vk::Image,
@@ -12,14 +47,16 @@ pub struct Texture {
     pub memory: vk::DeviceMemory,
     pub format: vk::Format,
     pub extent: vk::Extent2D,
+    pub texture_type: TextureType,
 }
 
 impl Texture {
-    /// Create a depth/stencil texture sized to `extent`.
-    pub fn create_depth(
+    /// Create a texture of the specified type
+    pub fn new(
         ctx: Arc<DeviceContext>,
+        texture_type: TextureType,
         extent: vk::Extent2D,
-        format: vk::Format, // e.g. vk::Format::D16_UNORM
+        format: vk::Format,
     ) -> anyhow::Result<Self> {
         let device = &ctx.device;
 
@@ -31,7 +68,7 @@ impl Texture {
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
+            .usage(texture_type.usage_flags())
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
         let image = unsafe { device.create_image(&image_info, None)? };
@@ -42,7 +79,9 @@ impl Texture {
             &ctx.device_memory_properties,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
         )
-        .ok_or_else(|| anyhow::anyhow!("No suitable memory for depth image"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("No suitable memory for {:?} texture", texture_type)
+        })?;
 
         let memory = unsafe {
             device.allocate_memory(
@@ -62,7 +101,7 @@ impl Texture {
                     .format(format)
                     .subresource_range(
                         vk::ImageSubresourceRange::default()
-                            .aspect_mask(vk::ImageAspectFlags::DEPTH)
+                            .aspect_mask(texture_type.aspect_flags())
                             .level_count(1)
                             .layer_count(1),
                     ),
@@ -77,7 +116,44 @@ impl Texture {
             memory,
             format,
             extent,
+            texture_type,
         })
+    }
+
+    /// Create a depth/stencil texture (convenience method)
+    pub fn create_depth(
+        ctx: Arc<DeviceContext>,
+        extent: vk::Extent2D,
+        format: vk::Format,
+    ) -> anyhow::Result<Self> {
+        Self::new(ctx, TextureType::Depth, extent, format)
+    }
+
+    /// Create a color texture (convenience method)
+    pub fn create_color(
+        ctx: Arc<DeviceContext>,
+        extent: vk::Extent2D,
+        format: vk::Format,
+    ) -> anyhow::Result<Self> {
+        Self::new(ctx, TextureType::Color, extent, format)
+    }
+
+    /// Create a storage texture (convenience method)
+    pub fn create_storage(
+        ctx: Arc<DeviceContext>,
+        extent: vk::Extent2D,
+        format: vk::Format,
+    ) -> anyhow::Result<Self> {
+        Self::new(ctx, TextureType::Storage, extent, format)
+    }
+
+    /// Create a sampled texture (convenience method)
+    pub fn create_sampled(
+        ctx: Arc<DeviceContext>,
+        extent: vk::Extent2D,
+        format: vk::Format,
+    ) -> anyhow::Result<Self> {
+        Self::new(ctx, TextureType::Sampled, extent, format)
     }
 }
 

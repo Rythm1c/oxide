@@ -16,6 +16,37 @@ pub struct SwapchainContext {
 }
 
 impl SwapchainContext {
+    fn select_best_surface_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
+        // Preferred format priority list
+        let preferred_formats = vec![
+            (vk::Format::B8G8R8A8_SRGB, vk::ColorSpaceKHR::SRGB_NONLINEAR),
+            (vk::Format::R8G8B8A8_SRGB, vk::ColorSpaceKHR::SRGB_NONLINEAR),
+            (vk::Format::B8G8R8_SRGB, vk::ColorSpaceKHR::SRGB_NONLINEAR),
+            (vk::Format::R8G8B8_SRGB, vk::ColorSpaceKHR::SRGB_NONLINEAR),
+        ];
+
+        // Try to find a preferred format
+        for (preferred_format, preferred_color_space) in preferred_formats {
+            if let Some(&format) = formats
+                .iter()
+                .find(|f| f.format == preferred_format && f.color_space == preferred_color_space)
+            {
+                return format;
+            }
+        }
+
+        // Fallback: look for any SRGB format
+        if let Some(&format) = formats
+            .iter()
+            .find(|f| f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR)
+        {
+            return format;
+        }
+
+        // Last resort: use the first available format
+        formats[0]
+    }
+
     pub fn new(
         instance: &Instance,
         device: &ash::Device,
@@ -25,9 +56,10 @@ impl SwapchainContext {
         window_width: u32,
         window_height: u32,
     ) -> anyhow::Result<Self> {
-        let surface_format = unsafe {
-            surface_loader.get_physical_device_surface_formats(physical_device, surface)?[0]
+        let surface_formats = unsafe {
+            surface_loader.get_physical_device_surface_formats(physical_device, surface)?
         };
+        let surface_format = Self::select_best_surface_format(&surface_formats);
 
         let surface_capabilities = unsafe {
             surface_loader.get_physical_device_surface_capabilities(physical_device, surface)?
