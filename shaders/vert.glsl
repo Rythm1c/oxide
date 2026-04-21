@@ -4,20 +4,30 @@
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 uv;
+layout(location = 3) in vec3 color;
+
 
 layout(location = 0) out vec3 o_normal;
+layout(location = 1) out vec2 o_uv;
+layout(location = 2) out vec3 o_color;
 
-layout(binding = 0) uniform UBO {
-    mat4 model;
+layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 projection;
-} ubo;
+} camUBO;
+
+layout(push_constant) uniform PushConstants {
+    mat4  model;
+} pc;
 
 void main() {
-    o_normal = normal;
+    o_normal = normalize(mat3(transpose(inverse(pc.model))) * normal);
+    o_uv = uv;
+    o_color = color;
 
-    vec4 worldPos = ubo.model * vec4(pos, 1.0);
-    vec4 viewPos = ubo.view * worldPos;
-    gl_Position = ubo.projection * viewPos;
+    vec4 worldPos = pc.model * vec4(pos, 1.0);
+    vec4 viewPos = camUBO.view * worldPos;
+    gl_Position = camUBO.projection * viewPos;
 
 }

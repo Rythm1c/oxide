@@ -12,19 +12,16 @@ use crate::shader::ShaderModule;
 // matrix (1 × 16 floats = 64 bytes) plus the model matrix for lighting (64).
 //
 // Layout (std430):
-//   offset  0: mat4 mvp      (model * view * proj, pre-multiplied on CPU)
 //   offset 64: mat4 model    (for normal/lighting transforms in the shader)
 //
 // In the vertex shader use:
 //   layout(push_constant) uniform PushConstants {
-//       mat4 mvp;
 //       mat4 model;
 //   } pc;
 // ---------------------------------------------------------------------------
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct PushConstants {
-    pub mvp: [[f32; 4]; 4],   // 64 bytes — pre-multiplied MVP
     pub model: [[f32; 4]; 4], // 64 bytes — model matrix for normals/lighting
 }
 
@@ -36,7 +33,11 @@ impl PushConstants {
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ];
-        Self { mvp: id, model: id }
+        Self { model: id }
+    }
+
+    pub fn from_model_matrix(model: [[f32; 4]; 4]) -> Self {
+        Self { model }
     }
 
     pub fn as_bytes(&self) -> &[u8] {

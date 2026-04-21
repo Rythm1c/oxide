@@ -10,5 +10,6 @@ pub mod renderer;
 pub mod shader;
 pub mod swapchain;
 pub mod texture;
+pub mod ubo;
 pub mod utils;
 pub mod vertex;

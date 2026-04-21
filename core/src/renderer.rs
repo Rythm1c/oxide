@@ -1,68 +1,8 @@
 use super::context::{VkContext, record_submit_commandbuffer_no_wait};
-use super::pipeline::{GraphicsPipeline, PushConstants};
+use super::pipeline::GraphicsPipeline;
+use crate::drawable::RenderObject;
 use ash::vk;
 use std::sync::Arc;
-
-// ---------------------------------------------------------------------------
-// RenderObject
-// ---------------------------------------------------------------------------
-
-pub struct RenderObject {
-    pub vertex_buffer: vk::Buffer,
-    pub index_buffer: Option<vk::Buffer>,
-    pub vertex_count: u32,
-    pub index_count: u32,
-    /// Per-object transform passed as push constants each draw call.
-    /// Set this every frame from your physics simulation.
-    pub push_constants: PushConstants,
-}
-
-impl RenderObject {
-    pub fn new(
-        vertex_buffer: vk::Buffer,
-        vertex_count: u32,
-        index_buffer: Option<vk::Buffer>,
-        index_count: u32,
-    ) -> Self {
-        Self {
-            vertex_buffer,
-            index_buffer,
-            vertex_count,
-            index_count,
-            push_constants: PushConstants::identity(),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Scene
-// ---------------------------------------------------------------------------
-
-pub struct Scene {
-    objects: Vec<RenderObject>,
-}
-
-impl Scene {
-    pub fn new() -> Self {
-        Self { objects: Vec::new() }
-    }
-
-    pub fn add_object(&mut self, object: RenderObject) {
-        self.objects.push(object);
-    }
-
-    pub fn objects(&self) -> &[RenderObject] {
-        &self.objects
-    }
-
-    pub fn objects_mut(&mut self) -> &mut Vec<RenderObject> {
-        &mut self.objects
-    }
-}
-
-impl Default for Scene {
-    fn default() -> Self { Self::new() }
-}
 
 // ---------------------------------------------------------------------------
 // Renderer
@@ -72,7 +12,6 @@ const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 pub struct Renderer {
     context: Arc<VkContext>,
-    current_scene: Option<Scene>,
     clear_color: [f32; 4],
 
     draw_command_buffers: Vec<vk::CommandBuffer>,
@@ -117,7 +56,6 @@ impl Renderer {
 
         Self {
             context,
-            current_scene: None,
             clear_color: [0.1, 0.1, 0.5, 1.0],
             draw_command_buffers,
             image_available_semaphores,
@@ -125,14 +63,6 @@ impl Renderer {
             in_flight_fences,
             current_frame: 0,
         }
-    }
-
-    pub fn set_scene(&mut self, scene: Scene) {
-        self.current_scene = Some(scene);
-    }
-
-    pub fn scene_mut(&mut self) -> Option<&mut Scene> {
-        self.current_scene.as_mut()
     }
 
     pub fn set_clear_color(&mut self, color: [f32; 4]) {
@@ -143,15 +73,19 @@ impl Renderer {
     ///
     /// Per-object `PushConstants` are uploaded via `cmd_push_constants` for
     /// every draw call, so the shader sees each object's correct MVP matrix.
-    pub fn render(&mut self, pipeline: &GraphicsPipeline) -> anyhow::Result<()> {
+    pub fn render(
+        &mut self,
+        pipeline: &GraphicsPipeline,
+        render_objects: &Vec<RenderObject>,
+    ) -> anyhow::Result<()> {
         let ctx = &self.context;
         let device = ctx.device();
         let frame = self.current_frame;
 
-        let cmd            = self.draw_command_buffers[frame];
+        let cmd = self.draw_command_buffers[frame];
         let image_available = self.image_available_semaphores[frame];
         let render_finished = self.render_finished_semaphores[frame];
-        let fence           = self.in_flight_fences[frame];
+        let fence = self.in_flight_fences[frame];
 
         // IMPORTANT: Wait for this frame's fence BEFORE reusing its semaphores.
         // This ensures the previous use of image_available semaphore has been fully consumed.
@@ -172,10 +106,15 @@ impl Renderer {
 
         let clear_values = [
             vk::ClearValue {
-                color: vk::ClearColorValue { float32: self.clear_color },
+                color: vk::ClearColorValue {
+                    float32: self.clear_color,
+                },
             },
             vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
             },
         ];
 
@@ -198,32 +137,34 @@ impl Renderer {
             &[image_available],
             &[render_finished],
             |device, cmd| unsafe {
-                device.cmd_begin_render_pass(cmd, &render_pass_begin_info, vk::SubpassContents::INLINE);
+                device.cmd_begin_render_pass(
+                    cmd,
+                    &render_pass_begin_info,
+                    vk::SubpassContents::INLINE,
+                );
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline.handle);
                 device.cmd_set_viewport(cmd, 0, &pipeline.viewports);
                 device.cmd_set_scissor(cmd, 0, &pipeline.scissors);
 
-                if let Some(scene) = &self.current_scene {
-                    for obj in scene.objects() {
-                        // Upload this object's MVP + model matrix as push constants.
-                        // This is the cheapest way to give each physics body its
-                        // own transform — no UBO allocation needed.
-                        device.cmd_push_constants(
-                            cmd,
-                            pipeline.layout,
-                            vk::ShaderStageFlags::VERTEX,
-                            0,
-                            obj.push_constants.as_bytes(),
-                        );
+                for obj in render_objects.iter() {
+                    // Upload this object's MVP + model matrix as push constants.
+                    // This is the cheapest way to give each physics body its
+                    // own transform — no UBO allocation needed.
+                    device.cmd_push_constants(
+                        cmd,
+                        pipeline.layout,
+                        vk::ShaderStageFlags::VERTEX,
+                        0,
+                        obj.push_constants.as_bytes(),
+                    );
 
-                        device.cmd_bind_vertex_buffers(cmd, 0, &[obj.vertex_buffer], &[0]);
+                    device.cmd_bind_vertex_buffers(cmd, 0, &[obj.vertex_buffer.raw], &[0]);
 
-                        if let Some(ib) = obj.index_buffer {
-                            device.cmd_bind_index_buffer(cmd, ib, 0, vk::IndexType::UINT32);
-                            device.cmd_draw_indexed(cmd, obj.index_count, 1, 0, 0, 0);
-                        } else {
-                            device.cmd_draw(cmd, obj.vertex_count, 1, 0, 0);
-                        }
+                    if let Some(ib) = &obj.index_buffer {
+                        device.cmd_bind_index_buffer(cmd, ib.raw, 0, vk::IndexType::UINT32);
+                        device.cmd_draw_indexed(cmd, obj.index_count, 1, 0, 0, 0);
+                    } else {
+                        device.cmd_draw(cmd, obj.vertex_count, 1, 0, 0);
                     }
                 }
 

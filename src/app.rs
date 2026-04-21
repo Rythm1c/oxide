@@ -1,12 +1,12 @@
-use super::camera::{Camera, CameraMovement};
-/* use super::cube::Cube;
-use super::triangle::Triangle; */
+use super::camera::CameraMovement;
 
 use engine_core::{
     context::VkContext,
     pipeline::{GraphicsPipeline, GraphicsPipelineConfig},
-    renderer::{RenderObject, Renderer, Scene},
+    renderer::Renderer,
 };
+
+use super::scene::Scene;
 
 use std::error::Error;
 use std::sync::Arc;
@@ -58,7 +58,7 @@ impl Drop for VulkanCore {
 struct App {
     window: Option<Window>,
     vulkan_core: Option<VulkanCore>,
-    camera: Option<Camera>, //scene: Option<Scene>,
+    scene: Option<Scene>,
     last_frame_time: Option<std::time::Instant>,
 }
 
@@ -78,11 +78,7 @@ impl ApplicationHandler for App {
             Some(VulkanCore::new("Vulkan App", self.window.as_ref().unwrap()).unwrap());
 
         // Create and setup the scene
-        let mut scene = Scene::new();
-
-        if let Some(core) = &mut self.vulkan_core {
-            core.renderer.set_scene(scene);
-        }
+        self.scene = Some(Scene::new());
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -101,9 +97,13 @@ impl ApplicationHandler for App {
                 self.last_frame_time = Some(now);
 
                 if let Some(core) = &mut self.vulkan_core {
-                    match core.renderer.render(&core.pipeline) {
-                        Ok(_) => {}
-                        Err(e) => eprintln!("Render error: {e}"),
+                    if let Some(scene) = &mut self.scene {
+                        scene.update(dt);
+
+                        match core.renderer.render(&core.pipeline, scene.objects()) {
+                            Ok(_) => {}
+                            Err(e) => eprintln!("Render error: {e}"),
+                        }
                     }
                 }
 
@@ -122,12 +122,12 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => {
-                if let Some(cam) = &mut self.camera {
+                if let Some(scene) = &mut self.scene {
                     match key {
-                        KeyCode::KeyW => cam.move_camera(CameraMovement::Forward),
-                        KeyCode::KeyS => cam.move_camera(CameraMovement::Backward),
-                        KeyCode::KeyA => cam.move_camera(CameraMovement::Left),
-                        KeyCode::KeyD => cam.move_camera(CameraMovement::Right),
+                        KeyCode::KeyW => scene.move_camera(CameraMovement::Forward),
+                        KeyCode::KeyS => scene.move_camera(CameraMovement::Backward),
+                        KeyCode::KeyA => scene.move_camera(CameraMovement::Left),
+                        KeyCode::KeyD => scene.move_camera(CameraMovement::Right),
                         KeyCode::Escape => {
                             self.vulkan_core.take();
                             event_loop.exit();
@@ -151,8 +151,9 @@ impl ApplicationHandler for App {
         event: DeviceEvent,
     ) {
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
-            // TODO: wire up to camera yaw/pitch when you add mouse capture
-            let _ = (dx, dy);
+            if let Some(scene) = &mut self.scene {
+                scene.rotate_camera(dx as f32, dy as f32);
+            }
         }
     }
 }
@@ -161,9 +162,8 @@ pub fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new()?;
 
     event_loop.set_control_flow(ControlFlow::Poll);
-
     event_loop.set_control_flow(ControlFlow::Wait);
-
+    
     let mut app = App::default();
     event_loop.run_app(&mut app)?;
 
