@@ -4,7 +4,7 @@ use super::triangle::Triangle; */
 
 use engine_core::{
     context::VkContext,
-    pipeline::GraphicsPipeline,
+    pipeline::{GraphicsPipeline, GraphicsPipelineConfig},
     renderer::{RenderObject, Renderer, Scene},
 };
 use math::vec3::vec3;
@@ -28,17 +28,15 @@ impl VulkanCore {
         let context = Arc::new(VkContext::new(
             app_name,
             window,
-            
             window.inner_size().width,
             window.inner_size().height,
         )?);
 
-        let pipeline = GraphicsPipeline::default()
-            .create_renderpass(&context)
-            .create_framebuffers(&context)
-            .create_layout(&context)
-            .create_shader_modules(&context, "shaders/vert.spv", "shaders/frag.spv")
-            .build(&context)?;
+        let cfg = GraphicsPipelineConfig::default()
+            .vertex_shader("shaders/vert.spv")
+            .fragment_shader("shaders/frag.spv");
+
+        let pipeline = GraphicsPipeline::create(&cfg, Arc::clone(&context))?;
 
         let renderer = Renderer::new(Arc::clone(&context));
 
@@ -82,7 +80,7 @@ impl ApplicationHandler for App {
         // Create and setup the scene
         let mut scene = Scene::new();
         if let Some(core) = &self.vulkan_core {
-        /*     let triangle = Triangle::new(&core.context);
+            /*     let triangle = Triangle::new(&core.context);
             let render_object = RenderObject {
                 vertex_buffer: triangle.vertex_buffer.buffer,
                 index_buffer: Some(triangle.index_buffer.buffer),
