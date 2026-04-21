@@ -1,9 +1,10 @@
 use super::context::{VkContext, record_submit_commandbuffer};
+use super::pipeline::{GraphicsPipeline, PushConstants};
 use ash::vk;
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
-// Scene / RenderObject
+// RenderObject
 // ---------------------------------------------------------------------------
 
 pub struct RenderObject {
@@ -11,7 +12,31 @@ pub struct RenderObject {
     pub index_buffer: Option<vk::Buffer>,
     pub vertex_count: u32,
     pub index_count: u32,
+    /// Per-object transform passed as push constants each draw call.
+    /// Set this every frame from your physics simulation.
+    pub push_constants: PushConstants,
 }
+
+impl RenderObject {
+    pub fn new(
+        vertex_buffer: vk::Buffer,
+        vertex_count: u32,
+        index_buffer: Option<vk::Buffer>,
+        index_count: u32,
+    ) -> Self {
+        Self {
+            vertex_buffer,
+            index_buffer,
+            vertex_count,
+            index_count,
+            push_constants: PushConstants::identity(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scene
+// ---------------------------------------------------------------------------
 
 pub struct Scene {
     objects: Vec<RenderObject>,
@@ -19,9 +44,7 @@ pub struct Scene {
 
 impl Scene {
     pub fn new() -> Self {
-        Self {
-            objects: Vec::new(),
-        }
+        Self { objects: Vec::new() }
     }
 
     pub fn add_object(&mut self, object: RenderObject) {
@@ -31,6 +54,14 @@ impl Scene {
     pub fn objects(&self) -> &[RenderObject] {
         &self.objects
     }
+
+    pub fn objects_mut(&mut self) -> &mut Vec<RenderObject> {
+        &mut self.objects
+    }
+}
+
+impl Default for Scene {
+    fn default() -> Self { Self::new() }
 }
 
 // ---------------------------------------------------------------------------
@@ -45,8 +76,6 @@ pub struct Renderer {
     clear_color: [f32; 4],
 
     draw_command_buffers: Vec<vk::CommandBuffer>,
-
-    // Per-frame sync
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     in_flight_fences: Vec<vk::Fence>,
@@ -56,10 +85,6 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(context: Arc<VkContext>) -> Self {
         let device = context.device();
-
-        let semaphore_info = vk::SemaphoreCreateInfo::default();
-        // Fences start signalled so the first wait in `render` doesn't block
-        let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
 
         let draw_command_buffers = unsafe {
             device
@@ -71,6 +96,10 @@ impl Renderer {
                 )
                 .expect("Failed to allocate draw command buffers")
         };
+
+        let semaphore_info = vk::SemaphoreCreateInfo::default();
+        // Start fences signalled so the first frame doesn't wait forever
+        let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
 
         let mut image_available_semaphores = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
         let mut render_finished_semaphores = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
@@ -89,7 +118,7 @@ impl Renderer {
         Self {
             context,
             current_scene: None,
-            clear_color: [0.1, 0.1, 0.15, 1.0],
+            clear_color: [0.05, 0.05, 0.08, 1.0],
             draw_command_buffers,
             image_available_semaphores,
             render_finished_semaphores,
@@ -102,29 +131,30 @@ impl Renderer {
         self.current_scene = Some(scene);
     }
 
+    pub fn scene_mut(&mut self) -> Option<&mut Scene> {
+        self.current_scene.as_mut()
+    }
+
     pub fn set_clear_color(&mut self, color: [f32; 4]) {
         self.clear_color = color;
     }
 
-    /// Draw one frame.
+    /// Render one frame.
     ///
-    /// Fix applied: `reset_fences` now happens inside `record_submit_commandbuffer`
-    /// (which already calls wait → reset → begin → record → end → submit).
-    /// The redundant manual wait+reset in the old `render` is removed.
-    pub fn render(&mut self, pipeline: &super::pipeline::GraphicsPipeline) -> anyhow::Result<()> {
+    /// Per-object `PushConstants` are uploaded via `cmd_push_constants` for
+    /// every draw call, so the shader sees each object's correct MVP matrix.
+    pub fn render(&mut self, pipeline: &GraphicsPipeline) -> anyhow::Result<()> {
         let ctx = &self.context;
         let device = ctx.device();
         let frame = self.current_frame;
 
-        let cmd = self.draw_command_buffers[frame];
+        let cmd            = self.draw_command_buffers[frame];
         let image_available = self.image_available_semaphores[frame];
         let render_finished = self.render_finished_semaphores[frame];
-        let fence = self.in_flight_fences[frame];
+        let fence           = self.in_flight_fences[frame];
 
-        // Acquire the next swapchain image.
-        // We pass `image_available` as the semaphore to signal.
-        // The fence here is null — we use our own per-frame fence via
-        // record_submit_commandbuffer which handles wait+reset correctly.
+        // Acquire next image — image_available will be signalled by the GPU
+        // when the image is ready to render into.
         let (present_index, _suboptimal) = unsafe {
             ctx.swapchain_loader().acquire_next_image(
                 ctx.swapchain(),
@@ -136,15 +166,10 @@ impl Renderer {
 
         let clear_values = [
             vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: self.clear_color,
-                },
+                color: vk::ClearColorValue { float32: self.clear_color },
             },
             vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
+                depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
             },
         ];
 
@@ -155,10 +180,10 @@ impl Renderer {
             .clear_values(&clear_values);
 
         // record_submit_commandbuffer:
-        //   1. wait_for_fences(fence)   ← blocks until previous frame done
-        //   2. reset_fences(fence)      ← ✓ fence is now unsignalled
+        //   1. wait_for_fences(fence)   — block until this frame slot is free
+        //   2. reset_fences(fence)      — unsignal the fence
         //   3. begin / record / end
-        //   4. queue_submit(..., fence) ← GPU will signal fence when done
+        //   4. queue_submit(..., fence) — GPU will signal fence when done
         record_submit_commandbuffer(
             device,
             cmd,
@@ -168,17 +193,24 @@ impl Renderer {
             &[image_available],
             &[render_finished],
             |device, cmd| unsafe {
-                device.cmd_begin_render_pass(
-                    cmd,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
+                device.cmd_begin_render_pass(cmd, &render_pass_begin_info, vk::SubpassContents::INLINE);
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline.handle);
                 device.cmd_set_viewport(cmd, 0, &pipeline.viewports);
                 device.cmd_set_scissor(cmd, 0, &pipeline.scissors);
 
                 if let Some(scene) = &self.current_scene {
                     for obj in scene.objects() {
+                        // Upload this object's MVP + model matrix as push constants.
+                        // This is the cheapest way to give each physics body its
+                        // own transform — no UBO allocation needed.
+                        device.cmd_push_constants(
+                            cmd,
+                            pipeline.layout,
+                            vk::ShaderStageFlags::VERTEX,
+                            0,
+                            obj.push_constants.as_bytes(),
+                        );
+
                         device.cmd_bind_vertex_buffers(cmd, 0, &[obj.vertex_buffer], &[0]);
 
                         if let Some(ib) = obj.index_buffer {
@@ -194,7 +226,6 @@ impl Renderer {
             },
         );
 
-        // Present
         unsafe {
             ctx.swapchain_loader().queue_present(
                 ctx.present_queue(),
@@ -214,11 +245,12 @@ impl Drop for Renderer {
     fn drop(&mut self) {
         let device = self.context.device();
         unsafe {
-            // Wait on all fences so we know the GPU is idle
-            device
-                .wait_for_fences(&self.in_flight_fences, true, u64::MAX)
-                .unwrap();
-
+            // Wait for all in-flight frames before destroying sync objects
+            if !self.in_flight_fences.is_empty() {
+                device
+                    .wait_for_fences(&self.in_flight_fences, true, u64::MAX)
+                    .unwrap();
+            }
             for s in self.image_available_semaphores.drain(..) {
                 device.destroy_semaphore(s, None);
             }

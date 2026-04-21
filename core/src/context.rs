@@ -16,7 +16,6 @@ use crate::swapchain::SwapchainContext;
 use crate::texture::Texture;
 
 pub struct VkContext {
-    // Keep entry + debug alive for the full lifetime
     pub entry: Entry,
     pub instance: Instance,
     pub debug_utils_loader: debug_utils::Instance,
@@ -25,16 +24,12 @@ pub struct VkContext {
     pub surface_loader: surface::Instance,
     pub surface: vk::SurfaceKHR,
 
-    // Core device — shared with buffers / textures
     pub device_ctx: Arc<DeviceContext>,
-
-    // Swapchain — recreated on resize
     pub swapchain_ctx: SwapchainContext,
 
-    // Depth buffer (Texture owns image + view + memory)
-    pub depth_texture: Texture,
+    // Option so we can manually drop before destroying the device in Drop
+    pub depth_texture: Option<Texture>,
 
-    // Setup command buffer / fence used for one-shot transfers during init
     pub setup_command_buffer: vk::CommandBuffer,
     pub setup_commands_reuse_fence: vk::Fence,
 }
@@ -46,7 +41,6 @@ impl VkContext {
         window_width: u32,
         window_height: u32,
     ) -> anyhow::Result<Self> {
-        // --- Entry & Instance -------------------------------------------
         let entry = unsafe { Entry::load()? };
 
         let layer_names = [c"VK_LAYER_KHRONOS_validation"];
@@ -89,7 +83,6 @@ impl VkContext {
             )?
         };
 
-        // --- Debug utils ------------------------------------------------
         let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::default()
             .message_severity(
                 vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
@@ -107,7 +100,6 @@ impl VkContext {
         let debug_callback =
             unsafe { debug_utils_loader.create_debug_utils_messenger(&debug_info, None)? };
 
-        // --- Surface ----------------------------------------------------
         let surface_loader = surface::Instance::new(&entry, &instance);
         let surface = unsafe {
             ash_window::create_surface(
@@ -119,7 +111,6 @@ impl VkContext {
             )?
         };
 
-        // --- Physical device & queue ------------------------------------
         let (physical_device, graphics_queue_index) =
             pick_physical_device(&instance, &surface_loader, surface)?;
 
@@ -148,7 +139,6 @@ impl VkContext {
         let graphics_queue = unsafe { device.get_device_queue(graphics_queue_index, 0) };
         println!("Graphics queue family index: {}", graphics_queue_index);
 
-        // --- Command pool -----------------------------------------------
         let pool = unsafe {
             device.create_command_pool(
                 &vk::CommandPoolCreateInfo::default()
@@ -158,7 +148,6 @@ impl VkContext {
             )?
         };
 
-        // --- DeviceContext (Arc — shared with Buffer / Texture) ---------
         let device_ctx = Arc::new(DeviceContext::new(
             device.clone(),
             physical_device,
@@ -168,7 +157,6 @@ impl VkContext {
             pool,
         )?);
 
-        // --- Setup command buffer ---------------------------------------
         let setup_command_buffer = unsafe {
             device.allocate_command_buffers(
                 &vk::CommandBufferAllocateInfo::default()
@@ -185,7 +173,6 @@ impl VkContext {
             )?
         };
 
-        // --- Swapchain --------------------------------------------------
         let swapchain_ctx = SwapchainContext::new(
             &instance,
             &device,
@@ -196,14 +183,12 @@ impl VkContext {
             window_height,
         )?;
 
-        // --- Depth texture ----------------------------------------------
         let depth_texture = Texture::create_depth(
             Arc::clone(&device_ctx),
             swapchain_ctx.surface_resolution,
             vk::Format::D16_UNORM,
         )?;
 
-        // Transition depth image layout
         record_submit_commandbuffer(
             &device,
             setup_command_buffer,
@@ -252,60 +237,44 @@ impl VkContext {
             surface,
             device_ctx,
             swapchain_ctx,
-            depth_texture,
+            depth_texture: Some(depth_texture),
             setup_command_buffer,
             setup_commands_reuse_fence,
         })
     }
 
-    /// Shorthand helpers so callers don't always have to reach into device_ctx.
-    #[inline]
-    pub fn device(&self) -> &ash::Device {
-        &self.device_ctx.device
-    }
-    #[inline]
-    pub fn surface_format(&self) -> vk::SurfaceFormatKHR {
-        self.swapchain_ctx.surface_format
-    }
-    #[inline]
-    pub fn surface_resolution(&self) -> vk::Extent2D {
-        self.swapchain_ctx.surface_resolution
-    }
-    #[inline]
-    pub fn swapchain(&self) -> vk::SwapchainKHR {
-        self.swapchain_ctx.swapchain
-    }
-    #[inline]
-    pub fn present_image_views(&self) -> &[vk::ImageView] {
-        &self.swapchain_ctx.present_image_views
-    }
-    #[inline]
-    pub fn depth_image_view(&self) -> vk::ImageView {
-        self.depth_texture.view
-    }
-    #[inline]
-    pub fn present_queue(&self) -> vk::Queue {
-        self.device_ctx.graphics_queue
-    }
-    #[inline]
-    pub fn swapchain_loader(&self) -> &swapchain::Device {
-        &self.swapchain_ctx.swapchain_loader
-    }
+    #[inline] pub fn device(&self) -> &ash::Device { &self.device_ctx.device }
+    #[inline] pub fn surface_format(&self) -> vk::SurfaceFormatKHR { self.swapchain_ctx.surface_format }
+    #[inline] pub fn surface_resolution(&self) -> vk::Extent2D { self.swapchain_ctx.surface_resolution }
+    #[inline] pub fn swapchain(&self) -> vk::SwapchainKHR { self.swapchain_ctx.swapchain }
+    #[inline] pub fn present_image_views(&self) -> &[vk::ImageView] { &self.swapchain_ctx.present_image_views }
+    #[inline] pub fn present_queue(&self) -> vk::Queue { self.device_ctx.graphics_queue }
+    #[inline] pub fn swapchain_loader(&self) -> &swapchain::Device { &self.swapchain_ctx.swapchain_loader }
 
-    pub fn destroy(&mut self) {
+    pub fn depth_image_view(&self) -> vk::ImageView {
+        self.depth_texture
+            .as_ref()
+            .expect("depth_texture already dropped")
+            .view
+    }
+}
+
+impl Drop for VkContext {
+    fn drop(&mut self) {
         unsafe {
             self.device().device_wait_idle().unwrap();
-            self.device()
-                .destroy_fence(self.setup_commands_reuse_fence, None);
 
-            // depth_texture Drop handles image/view/memory cleanup
-            // (but we need to drop it before the device is destroyed)
-            // We rely on field drop order: depth_texture before device_ctx.
-            // In Rust, fields drop in declaration order (top to bottom).
+            // *** Drop depth_texture BEFORE destroying the device.
+            // Texture::drop calls destroy_image_view / free_memory / destroy_image
+            // on device_ctx.device — those calls must happen while the device
+            // is still alive. Without this explicit drop the Texture would be
+            // destroyed AFTER destroy_device() via Rust's field drop order,
+            // causing the VkImage/VkDeviceMemory validation errors. ***
+            drop(self.depth_texture.take());
 
+            self.device().destroy_fence(self.setup_commands_reuse_fence, None);
             self.swapchain_ctx.destroy(self.device());
-            self.device()
-                .destroy_command_pool(self.device_ctx.pool, None);
+            self.device().destroy_command_pool(self.device_ctx.pool, None);
             self.device().destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
             self.debug_utils_loader
@@ -315,37 +284,22 @@ impl VkContext {
     }
 }
 
-impl Drop for VkContext {
-    fn drop(&mut self) {
-        self.destroy();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 fn pick_physical_device(
     instance: &Instance,
     surface_loader: &surface::Instance,
     surface: vk::SurfaceKHR,
 ) -> anyhow::Result<(vk::PhysicalDevice, u32)> {
     let devices = unsafe { instance.enumerate_physical_devices()? };
-
-    // Prefer discrete GPU, fall back to anything with graphics
     let mut fallback: Option<(vk::PhysicalDevice, u32)> = None;
 
     for pdev in devices {
         let props = unsafe { instance.get_physical_device_properties(pdev) };
         let families = unsafe { instance.get_physical_device_queue_family_properties(pdev) };
 
-        let graphics_index = families.iter().enumerate().find_map(|(i, fp)| {
-            if fp.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                Some(i as u32)
-            } else {
-                None
-            }
-        });
+        let graphics_index = families
+            .iter()
+            .enumerate()
+            .find_map(|(i, fp)| fp.queue_flags.contains(vk::QueueFlags::GRAPHICS).then_some(i as u32));
 
         if let Some(idx) = graphics_index {
             let name = unsafe { ffi::CStr::from_ptr(props.device_name.as_ptr()) }
@@ -384,10 +338,7 @@ pub fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
             .reset_fences(&[command_buffer_reuse_fence])
             .expect("Reset fences failed");
         device
-            .reset_command_buffer(
-                command_buffer,
-                vk::CommandBufferResetFlags::RELEASE_RESOURCES,
-            )
+            .reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::RELEASE_RESOURCES)
             .expect("Reset command buffer failed");
 
         device
@@ -400,9 +351,7 @@ pub fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
 
         f(device, command_buffer);
 
-        device
-            .end_command_buffer(command_buffer)
-            .expect("End command buffer failed");
+        device.end_command_buffer(command_buffer).expect("End command buffer failed");
 
         device
             .queue_submit(

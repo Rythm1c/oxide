@@ -1,4 +1,4 @@
-use super::camera::Camera;
+use super::camera::{Camera, CameraMovement};
 /* use super::cube::Cube;
 use super::triangle::Triangle; */
 
@@ -7,14 +7,14 @@ use engine_core::{
     pipeline::{GraphicsPipeline, GraphicsPipelineConfig},
     renderer::{RenderObject, Renderer, Scene},
 };
-use math::vec3::vec3;
 
 use std::error::Error;
 use std::sync::Arc;
 
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
 struct VulkanCore {
@@ -50,8 +50,7 @@ impl VulkanCore {
 
 impl Drop for VulkanCore {
     fn drop(&mut self) {
-        unsafe { self.context.device.device_wait_idle().unwrap() };
-        self.pipeline.destroy(&self.context);
+        unsafe { self.context.device().device_wait_idle().unwrap() };
     }
 }
 
@@ -60,43 +59,26 @@ struct App {
     window: Option<Window>,
     vulkan_core: Option<VulkanCore>,
     camera: Option<Camera>, //scene: Option<Scene>,
+    last_frame_time: Option<std::time::Instant>,
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = Some(
             event_loop
-                .create_window(Window::default_attributes())
+                .create_window(
+                    Window::default_attributes()
+                        .with_title("Vulkan Physics Demo")
+                        .with_inner_size(winit::dpi::LogicalSize::new(800u32, 600u32)),
+                )
                 .unwrap(),
         );
-        self.window
-            .as_ref()
-            .unwrap()
-            .set_title("Vulkan Application");
 
         self.vulkan_core =
             Some(VulkanCore::new("Vulkan App", self.window.as_ref().unwrap()).unwrap());
 
         // Create and setup the scene
         let mut scene = Scene::new();
-        if let Some(core) = &self.vulkan_core {
-            /*     let triangle = Triangle::new(&core.context);
-            let render_object = RenderObject {
-                vertex_buffer: triangle.vertex_buffer.buffer,
-                index_buffer: Some(triangle.index_buffer.buffer),
-                index_count: triangle.index_buffer.data.len() as u32,
-                vertex_count: triangle.vertex_buffer.data.len() as u32,
-            };
-            scene.add_object(render_object); */
-
-            //let cube = Cube::new(&core.context, vec3(0.0, 2.0, 3.0), 1.0, vec3(1.0, 1.0, 1.0));
-            /* let cube_render_object = RenderObject {
-                vertex_buffer: cube.vertex_buffer.buffer,
-                index_buffer: Some(cube.index_buffer.buffer),
-                index_count: cube.index_buffer.data.len() as u32,
-                vertex_count: cube.vertex_buffer.data.len() as u32,
-            }; */
-        }
 
         if let Some(core) = &mut self.vulkan_core {
             core.renderer.set_scene(scene);
@@ -107,15 +89,70 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
+                self.vulkan_core.take();
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                self.window.as_ref().unwrap().request_redraw();
+                let now = std::time::Instant::now();
+                let dt = self
+                    .last_frame_time
+                    .map(|t| now.duration_since(t).as_secs_f32())
+                    .unwrap_or(1.0 / 60.0);
+                self.last_frame_time = Some(now);
+
                 if let Some(core) = &mut self.vulkan_core {
-                    core.renderer.render(&core.pipeline).unwrap();
+                    match core.renderer.render(&core.pipeline) {
+                        Ok(_) => {}
+                        Err(e) => eprintln!("Render error: {e}"),
+                    }
+                }
+
+                // In Poll mode we must explicitly request the next redraw
+                if let Some(window) = &self.window {
+                    window.request_redraw();
                 }
             }
+
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(key),
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => {
+                if let Some(cam) = &mut self.camera {
+                    match key {
+                        KeyCode::KeyW => cam.move_camera(CameraMovement::Forward),
+                        KeyCode::KeyS => cam.move_camera(CameraMovement::Backward),
+                        KeyCode::KeyA => cam.move_camera(CameraMovement::Left),
+                        KeyCode::KeyD => cam.move_camera(CameraMovement::Right),
+                        KeyCode::Escape => {
+                            self.vulkan_core.take();
+                            event_loop.exit();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            WindowEvent::Resized(_) => {
+                // TODO: recreate swapchain on resize
+            }
             _ => (),
+        }
+    }
+
+    // Mouse look via raw device events (more reliable than cursor delta)
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
+            // TODO: wire up to camera yaw/pitch when you add mouse capture
+            let _ = (dx, dy);
         }
     }
 }
