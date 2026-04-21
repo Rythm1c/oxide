@@ -118,7 +118,7 @@ impl Renderer {
         Self {
             context,
             current_scene: None,
-            clear_color: [0.05, 0.05, 0.08, 1.0],
+            clear_color: [0.1, 0.1, 0.5, 1.0],
             draw_command_buffers,
             image_available_semaphores,
             render_finished_semaphores,

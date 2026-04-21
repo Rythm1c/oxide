@@ -1,6 +1,7 @@
 pub mod allocator;
 pub mod buffer;
 pub mod context;
+pub mod descriptor;
 pub mod device;
 pub mod drawable;
 pub mod material;

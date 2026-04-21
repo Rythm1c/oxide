@@ -1,12 +1,10 @@
-use std::error::Error;
+use anyhow;
 
 mod app;
 mod camera;
-mod cube;
 mod scene;
-mod triangle;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> anyhow::Result<()> {
     app::run()?;
     Ok(())
 }

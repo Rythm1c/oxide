@@ -68,7 +68,7 @@ impl ApplicationHandler for App {
             event_loop
                 .create_window(
                     Window::default_attributes()
-                        .with_title("Vulkan Physics Demo")
+                        .with_title("Enceladus")
                         .with_inner_size(winit::dpi::LogicalSize::new(800u32, 600u32)),
                 )
                 .unwrap(),
@@ -157,7 +157,7 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new()?;
 
     event_loop.set_control_flow(ControlFlow::Poll);
