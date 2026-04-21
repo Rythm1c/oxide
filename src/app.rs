@@ -28,6 +28,7 @@ impl VulkanCore {
         let context = Arc::new(VkContext::new(
             app_name,
             window,
+            
             window.inner_size().width,
             window.inner_size().height,
         )?);

@@ -1,6 +1,13 @@
+pub mod allocator;
 pub mod buffer;
 pub mod context;
+pub mod device;
+pub mod drawable;
 pub mod material;
 pub mod pipeline;
 pub mod renderer;
+pub mod shader;
+pub mod swapchain;
+pub mod texture;
+pub mod utils;
 pub mod vertex;

@@ -8,6 +8,7 @@ ash = "0.38.0"
 ash-window = "0.13.0"
 engine-core = { path = "./core" }
 math = { path = "./math" }
+geometry = { path = "./geometry" }
 env_logger = "0.11.8"
 log = "0.4.27"
 winit = "0.30.11"

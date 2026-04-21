@@ -6,24 +6,15 @@ pub struct Mat3 {
 }
 
 pub fn mat3(
-    xx: f32,
-    xy: f32,
-    xz: f32,
-
-    yx: f32,
-    yy: f32,
-    yz: f32,
-
-    zx: f32,
-    zy: f32,
-    zz: f32,
+    xx: f32, xy: f32, xz: f32,
+    yx: f32, yy: f32, yz: f32,
+    zx: f32, zy: f32, zz: f32,
 ) -> Mat3 {
     Mat3 {
         data: [
             [xx, xy, xz],
             [yx, yy, yz],
             [zx, zy, zz],
-          
         ],
     }
 }
