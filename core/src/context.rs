@@ -330,13 +330,62 @@ pub fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
     signal_semaphores: &[vk::Semaphore],
     f: F,
 ) {
+    record_submit_commandbuffer_internal(
+        device,
+        command_buffer,
+        command_buffer_reuse_fence,
+        submit_queue,
+        wait_mask,
+        wait_semaphores,
+        signal_semaphores,
+        true,
+        f,
+    );
+}
+
+pub fn record_submit_commandbuffer_no_wait<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
+    device: &ash::Device,
+    command_buffer: vk::CommandBuffer,
+    command_buffer_reuse_fence: vk::Fence,
+    submit_queue: vk::Queue,
+    wait_mask: &[vk::PipelineStageFlags],
+    wait_semaphores: &[vk::Semaphore],
+    signal_semaphores: &[vk::Semaphore],
+    f: F,
+) {
+    record_submit_commandbuffer_internal(
+        device,
+        command_buffer,
+        command_buffer_reuse_fence,
+        submit_queue,
+        wait_mask,
+        wait_semaphores,
+        signal_semaphores,
+        false,
+        f,
+    );
+}
+
+fn record_submit_commandbuffer_internal<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
+    device: &ash::Device,
+    command_buffer: vk::CommandBuffer,
+    command_buffer_reuse_fence: vk::Fence,
+    submit_queue: vk::Queue,
+    wait_mask: &[vk::PipelineStageFlags],
+    wait_semaphores: &[vk::Semaphore],
+    signal_semaphores: &[vk::Semaphore],
+    wait_for_fence: bool,
+    f: F,
+) {
     unsafe {
-        device
-            .wait_for_fences(&[command_buffer_reuse_fence], true, u64::MAX)
-            .expect("Wait for fence failed");
-        device
-            .reset_fences(&[command_buffer_reuse_fence])
-            .expect("Reset fences failed");
+        if wait_for_fence {
+            device
+                .wait_for_fences(&[command_buffer_reuse_fence], true, u64::MAX)
+                .expect("Wait for fence failed");
+            device
+                .reset_fences(&[command_buffer_reuse_fence])
+                .expect("Reset fences failed");
+        }
         device
             .reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::RELEASE_RESOURCES)
             .expect("Reset command buffer failed");

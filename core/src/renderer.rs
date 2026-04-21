@@ -1,4 +1,4 @@
-use super::context::{VkContext, record_submit_commandbuffer};
+use super::context::{VkContext, record_submit_commandbuffer_no_wait};
 use super::pipeline::{GraphicsPipeline, PushConstants};
 use ash::vk;
 use std::sync::Arc;
@@ -153,8 +153,14 @@ impl Renderer {
         let render_finished = self.render_finished_semaphores[frame];
         let fence           = self.in_flight_fences[frame];
 
-        // Acquire next image — image_available will be signalled by the GPU
-        // when the image is ready to render into.
+        // IMPORTANT: Wait for this frame's fence BEFORE reusing its semaphores.
+        // This ensures the previous use of image_available semaphore has been fully consumed.
+        unsafe {
+            device.wait_for_fences(&[fence], true, u64::MAX)?;
+            device.reset_fences(&[fence])?;
+        }
+
+        // Now safe to acquire next image — previous frame's submission is complete
         let (present_index, _suboptimal) = unsafe {
             ctx.swapchain_loader().acquire_next_image(
                 ctx.swapchain(),
@@ -179,12 +185,11 @@ impl Renderer {
             .render_area(ctx.surface_resolution().into())
             .clear_values(&clear_values);
 
-        // record_submit_commandbuffer:
-        //   1. wait_for_fences(fence)   — block until this frame slot is free
-        //   2. reset_fences(fence)      — unsignal the fence
-        //   3. begin / record / end
-        //   4. queue_submit(..., fence) — GPU will signal fence when done
-        record_submit_commandbuffer(
+        // record_submit_commandbuffer_no_wait:
+        //   1. Skip wait/reset (we already did it above)
+        //   2. begin / record / end
+        //   3. queue_submit(..., fence) — GPU will signal fence when done
+        record_submit_commandbuffer_no_wait(
             device,
             cmd,
             fence,
