@@ -1,27 +1,66 @@
-use ash::util::read_spv;
 use ash::vk;
 
-use crate::vertex::Vertex;
+use std::sync::Arc;
 
 use super::context::VkContext;
+use crate::vertex::Vertex;
 
-#[derive(Debug, Default, Clone)]
+use crate::shader::ShaderModule;
+
+#[derive(Default, Clone)]
+pub struct GraphicsPipelineConfig {
+    vert_shader_path: String,
+    frag_shader_path: Option<String>,
+}
+
+impl GraphicsPipelineConfig {
+    pub fn vertex_shader(mut self, path: &str) -> Self {
+        self.vert_shader_path = path.to_string();
+        self
+    }
+
+    pub fn fragment_shader(mut self, path: &str) -> Self {
+        self.frag_shader_path = Some(path.to_string());
+        self
+    }
+}
+
+#[derive(Clone)]
 pub struct GraphicsPipeline {
+    ctx: Arc<VkContext>,
     pub handle: ash::vk::Pipeline,
     pub layout: ash::vk::PipelineLayout,
     pub renderpass: ash::vk::RenderPass,
     pub framebuffers: Vec<vk::Framebuffer>,
     pub viewports: Vec<vk::Viewport>,
     pub scissors: Vec<vk::Rect2D>,
-    fragment_shader_module: ash::vk::ShaderModule,
-    vertex_shader_module: ash::vk::ShaderModule,
 }
 
 impl GraphicsPipeline {
-    pub fn create_renderpass(&mut self, context: &VkContext) -> &mut Self {
+    pub fn create(config: &GraphicsPipelineConfig, ctx: Arc<VkContext>) -> anyhow::Result<Self> {
+        let mut pipeline = GraphicsPipeline {
+            ctx,
+            handle: vk::Pipeline::null(),
+            layout: vk::PipelineLayout::null(),
+            renderpass: vk::RenderPass::null(),
+            framebuffers: Vec::new(),
+            viewports: Vec::new(),
+            scissors: Vec::new(),
+        };
+
+        pipeline
+            .create_renderpass()
+            .create_framebuffers()
+            .create_layout()
+            .create_pipeline(config)?;
+
+        Ok(pipeline)
+    }
+
+    pub fn create_renderpass(&mut self) -> &mut Self {
         let renderpass_attachments = [
             ash::vk::AttachmentDescription {
-                format: context.surface_format.format,
+                format: self.ctx.swapchain_ctx.surface_format.format,
                 samples: ash::vk::SampleCountFlags::TYPE_1,
                 load_op: ash::vk::AttachmentLoadOp::CLEAR,
                 store_op: ash::vk::AttachmentStoreOp::STORE,
@@ -68,8 +107,8 @@ impl GraphicsPipeline {
             .dependencies(&dependencies);
 
         self.renderpass = unsafe {
-            context
-                .device
+            self.ctx
+                .device()
                 .create_render_pass(&renderpass_createinfo, None)
                 .expect("Failed to create render pass")
         };
@@ -77,34 +116,35 @@ impl GraphicsPipeline {
         self
     }
 
-    pub fn create_layout(&mut self, context: &VkContext) -> &mut Self {
+    pub fn create_layout(&mut self) -> &mut Self {
         let layout_info = ash::vk::PipelineLayoutCreateInfo::default();
 
         self.layout = unsafe {
-            context
-                .device
+            self.ctx
+                .device()
                 .create_pipeline_layout(&layout_info, None)
                 .expect("Failed to create pipeline layout")
         };
         self
     }
 
-    pub fn create_framebuffers(&mut self, context: &VkContext) -> &mut Self {
-        self.framebuffers = context
-            .present_image_views
+    pub fn create_framebuffers(&mut self) -> &mut Self {
+        self.framebuffers = self
+            .ctx
+            .present_image_views()
             .iter()
             .map(|&present_image_view| {
-                let framebuffer_attachments = [present_image_view, context.depth_image_view];
+                let framebuffer_attachments = [present_image_view, self.ctx.depth_image_view()];
                 let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
                     .render_pass(self.renderpass)
                     .attachments(&framebuffer_attachments)
-                    .width(context.surface_resolution.width)
-                    .height(context.surface_resolution.height)
+                    .width(self.ctx.surface_resolution().width)
+                    .height(self.ctx.surface_resolution().height)
                     .layers(1);
 
                 unsafe {
-                    context
-                        .device
+                    self.ctx
+                        .device()
                         .create_framebuffer(&frame_buffer_create_info, None)
                         .unwrap()
                 }
@@ -114,44 +154,32 @@ impl GraphicsPipeline {
         self
     }
 
-    pub fn create_shader_modules(
-        &mut self,
-        context: &VkContext,
-        vert_path: &str,
-        frag_path: &str,
-    ) -> &mut Self {
-        let vert_code = read_shader_spv(vert_path).unwrap();
-        let vertex_shader_info = vk::ShaderModuleCreateInfo::default().code(&vert_code);
+    pub fn create_pipeline(&mut self, cfg: &GraphicsPipelineConfig) -> anyhow::Result<Self> {
+        let vertex_shader_module =
+            ShaderModule::load_from_file(Arc::clone(&self.ctx.device_ctx), &cfg.vert_shader_path)?;
 
-        let frag_code = read_shader_spv(frag_path).unwrap();
-        let fragment_shader_info = vk::ShaderModuleCreateInfo::default().code(&frag_code);
-        self.vertex_shader_module = unsafe {
-            context
-                .device
-                .create_shader_module(&vertex_shader_info, None)
-                .expect("Failed to create vertex shader module")
-        };
-        self.fragment_shader_module = unsafe {
-            context
-                .device
-                .create_shader_module(&fragment_shader_info, None)
-                .expect("Failed to create fragment shader module")
+        let fragment_shader_module = if let Some(ref frag_path) = cfg.frag_shader_path {
+            Some(ShaderModule::load_from_file(
+                Arc::clone(&self.ctx.device_ctx),
+                frag_path,
+            )?)
+        } else {
+            None
         };
 
-        self
-    }
-
-    pub fn build(&mut self, context: &VkContext) -> Result<Self, std::io::Error> {
         let shader_entry_name = c"main";
         let shader_stage_create_infos = [
             vk::PipelineShaderStageCreateInfo {
-                module: self.vertex_shader_module,
+                module: vertex_shader_module.module,
                 p_name: shader_entry_name.as_ptr(),
                 stage: vk::ShaderStageFlags::VERTEX,
                 ..Default::default()
             },
             vk::PipelineShaderStageCreateInfo {
-                module: self.fragment_shader_module,
+                module: fragment_shader_module
+                    .as_ref()
+                    .map(|m| m.module)
+                    .unwrap_or(vk::ShaderModule::null()),
                 p_name: shader_entry_name.as_ptr(),
                 stage: vk::ShaderStageFlags::FRAGMENT,
                 ..Default::default()
@@ -172,13 +200,13 @@ impl GraphicsPipeline {
         self.viewports = vec![vk::Viewport {
             x: 0.0,
             y: 0.0,
-            width: context.surface_resolution.width as f32,
-            height: context.surface_resolution.height as f32,
+            width: self.ctx.surface_resolution().width as f32,
+            height: self.ctx.surface_resolution().height as f32,
             min_depth: 0.0,
             max_depth: 1.0,
         }];
 
-        self.scissors = vec![context.surface_resolution.into()];
+        self.scissors = vec![self.ctx.surface_resolution().into()];
 
         let viewport_state_info = vk::PipelineViewportStateCreateInfo::default()
             .viewports(&self.viewports)
@@ -247,8 +275,8 @@ impl GraphicsPipeline {
             .render_pass(self.renderpass);
 
         self.handle = unsafe {
-            context
-                .device
+            self.ctx
+                .device()
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[graphic_pipeline_info],
@@ -259,35 +287,19 @@ impl GraphicsPipeline {
 
         Ok(self.clone())
     }
-
-    pub fn destroy(&mut self, context: &VkContext) {
-        unsafe {
-            context
-                .device
-                .destroy_shader_module(self.vertex_shader_module, None);
-            context
-                .device
-                .destroy_shader_module(self.fragment_shader_module, None);
-            for &framebuffer in &self.framebuffers {
-                context.device.destroy_framebuffer(framebuffer, None);
-            }
-            context.device.destroy_render_pass(self.renderpass, None);
-            context.device.destroy_pipeline_layout(self.layout, None);
-            context.device.destroy_pipeline(self.handle, None);
-        }
-    }
 }
 
-use std::fs::File;
-use std::io::BufReader;
-
-// Reads a SPIR-V file and returns a Vec<u32> containing the binary code
-fn read_shader_spv(path: &str) -> std::io::Result<Vec<u32>> {
-    // Open the file in read-only mode
-    let file = File::open(path)?;
-    // Wrap the file in a buffered reader for efficient reading
-    let mut reader = BufReader::new(file);
-    // Use ash's utility to read the SPIR-V binary into a Vec<u32>
-    let spv = read_spv(&mut reader)?;
-    Ok(spv)
+impl Drop for GraphicsPipeline {
+    fn drop(&mut self) {
+        // We can't destroy the pipeline here because we need the context, and we don't have it.
+        // The pipeline should be explicitly destroyed by the owner of the context before the context is dropped.
+        unsafe {
+            for &framebuffer in &self.framebuffers {
+                self.ctx.device().destroy_framebuffer(framebuffer, None);
+            }
+            self.ctx.device().destroy_render_pass(self.renderpass, None);
+            self.ctx.device().destroy_pipeline_layout(self.layout, None);
+            self.ctx.device().destroy_pipeline(self.handle, None);
+        }
+    }
 }
