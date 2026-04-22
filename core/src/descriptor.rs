@@ -1,133 +1,157 @@
 use ash::vk;
+use std::sync::Arc;
 
-use super::buffer::Buffer;
-use super::ubo::{CameraUBO, LightUBO};
+use super::buffer::{Buffer, BufferUsage};
 use super::device::DeviceContext;
+use super::ubo::{CameraUbo, LightUbo};
 
 // global set for the camera and light UBOs, which are shared across all draw calls
 pub struct GlobalDescriptorSet {
-    ctx: DeviceContext,
+    ctx: Arc<DeviceContext>,
 
-    pub set_layout: vk::DescriptorSetLayout,
-    pub pool: vk::DescriptorPool,
-    pub set: Vec<vk::DescriptorSet>,// one per frame in flight
+    pub layout: vk::DescriptorSetLayout,
+    pool: vk::DescriptorPool,
+    sets: Vec<vk::DescriptorSet>, // one per frame in flight
 
-    pub camera_buffer: Vec<Buffer>,
-    pub light_buffer: Vec<Buffer>,
+    camera_buffers: Vec<Buffer>,
+    light_buffers: Vec<Buffer>,
 }
 
 impl GlobalDescriptorSet {
-    pub fn new(ctx: DeviceContext) -> anyhow::Result<Self> {
-        // Create descriptor set layout
-        let set_layout = unsafe {
-            ctx.device.create_descriptor_set_layout(
-                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&[
-                    vk::DescriptorSetLayoutBinding {
-                        binding: 0,
-                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                        descriptor_count: 1,
-                        stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                        ..Default::default()
-                    },
-                    vk::DescriptorSetLayoutBinding {
-                        binding: 1,
-                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                        descriptor_count: 1,
-                        stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                        ..Default::default()
-                    },
-                ]),
-                None,
-            )
-        }?;
+    pub fn new(ctx: Arc<DeviceContext>, frames_in_flight: usize) -> anyhow::Result<Self> {
+        let device = &ctx.device;
 
-        // Create descriptor pool
+        let bindings = [
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(1)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+        ];
+
+        let layout = unsafe {
+            device.create_descriptor_set_layout(
+                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
+                None,
+            )?
+        };
+
+        // We need `frames_in_flight` sets, each with 2 UBO descriptors.
+        let pool_sizes = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            // 2 bindings × frames_in_flight
+            descriptor_count: (2 * frames_in_flight) as u32,
+        }];
+
         let pool = unsafe {
-            ctx.device.create_descriptor_pool(
+            device.create_descriptor_pool(
                 &vk::DescriptorPoolCreateInfo::default()
-                    .pool_sizes(&[
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::UNIFORM_BUFFER,
-                            descriptor_count: (2 * MAX_FRAMES_IN_FLIGHT) as u32, // camera + light per frame
-                        },
-                    ])
-                    .max_sets(MAX_FRAMES_IN_FLIGHT as u32),
+                    .max_sets(frames_in_flight as u32)
+                    .pool_sizes(&pool_sizes),
                 None,
-            )
-        }?;
+            )?
+        };
 
-        // Allocate descriptor sets
-        let set_layouts = vec![set_layout; MAX_FRAMES_IN_FLIGHT];
+        let layouts: Vec<vk::DescriptorSetLayout> = vec![layout; frames_in_flight];
         let sets = unsafe {
-            ctx.device.allocate_descriptor_sets(
+            device.allocate_descriptor_sets(
                 &vk::DescriptorSetAllocateInfo::default()
                     .descriptor_pool(pool)
-                    .set_layouts(&set_layouts),
-            )
-        }?;
+                    .set_layouts(&layouts),
+            )?
+        };
 
-        // Create buffers for each frame in flight
-        let mut camera_buffers = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
-        let mut light_buffers = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
+        let camera_size = std::mem::size_of::<CameraUbo>() as vk::DeviceSize;
+        let light_size = std::mem::size_of::<LightUbo>() as vk::DeviceSize;
 
-        for _ in 0..MAX_FRAMES_IN_FLIGHT {
-            camera_buffers.push(Buffer::new_uniform_buffer(
-                &ctx,
-                std::mem::size_of::<CameraUBO>() as u64,
+        let mut camera_buffers = Vec::with_capacity(frames_in_flight);
+        let mut light_buffers  = Vec::with_capacity(frames_in_flight);
+
+        for _ in 0..frames_in_flight {
+            camera_buffers.push(Buffer::new(
+                Arc::clone(&ctx),
+                camera_size,
+                BufferUsage::UNIFORM,
             )?);
-            light_buffers.push(Buffer::new_uniform_buffer(
-                &ctx,
-                std::mem::size_of::<LightUBO>() as u64,
+            light_buffers.push(Buffer::new(
+                Arc::clone(&ctx),
+                light_size,
+                BufferUsage::UNIFORM,
             )?);
         }
 
-        // Update descriptor sets to point to
-        for i in 0..MAX_FRAMES_IN_FLIGHT {
-            let camera_buffer_info = vk::DescriptorBufferInfo {
-                buffer: camera_buffers[i].buffer,
-                offset: 0,
-                range: std::mem::size_of::<CameraUBO>() as u64,
-            };
-            let light_buffer_info = vk::DescriptorBufferInfo {
-                buffer: light_buffers[i].buffer,
-                offset: 0,
-                range: std::mem::size_of::<LightUBO>() as u64,
-            };
+        let mut descriptor_writes = Vec::with_capacity(frames_in_flight * 2);
 
-            let descriptor_writes = [
-                vk::WriteDescriptorSet {
-                    dst_set: sets[i],
-                    dst_binding: 0,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    buffer_info: std::slice::from_ref(&camera_buffer_info),
-                    ..Default::default()
-                },
-                vk::WriteDescriptorSet {
-                    dst_set: sets[i],
-                    dst_binding: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    buffer_info: std::slice::from_ref(&light_buffer_info),
-                    ..Default::default()
-                },
-            ];
+        let mut camera_infos: Vec<[vk::DescriptorBufferInfo; 1]> =
+            Vec::with_capacity(frames_in_flight);
+        let mut light_infos: Vec<[vk::DescriptorBufferInfo; 1]> =
+            Vec::with_capacity(frames_in_flight);
 
-            unsafe {
-                ctx.device.update_descriptor_sets(&descriptor_writes, &[]);
-            }
+        for i in 0..frames_in_flight {
+            camera_infos.push([vk::DescriptorBufferInfo {
+                buffer: camera_buffers[i].raw,
+                offset: 0,
+                range: camera_size,
+            }]);
+            light_infos.push([vk::DescriptorBufferInfo {
+                buffer: light_buffers[i].raw,
+                offset: 0,
+                range: light_size,
+            }]);
         }
+
+        for i in 0..frames_in_flight {
+            descriptor_writes.push(
+                vk::WriteDescriptorSet::default()
+                    .dst_set(sets[i])
+                    .dst_binding(0)
+                    .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                    .buffer_info(&camera_infos[i]),
+            );
+            descriptor_writes.push(
+                vk::WriteDescriptorSet::default()
+                    .dst_set(sets[i])
+                    .dst_binding(1)
+                    .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                    .buffer_info(&light_infos[i]),
+            );
+        }
+
+        unsafe { device.update_descriptor_sets(&descriptor_writes, &[]) };
+
+        Ok(Self {
+            ctx,
+            layout,
+            pool,
+            camera_buffers,
+            light_buffers,
+            sets,
+        })
     }
-    pub fn update(&mut self, camera_ubo: &CameraUBO, light_ubo: &LightUBO) -> anyhow::Result<()> {
-        self.camera_buffer.write(&[camera_ubo])?;
-        self.light_buffer.write(&[light_ubo])?;
+
+    pub fn set(&self, frame: usize) -> vk::DescriptorSet {
+        self.sets[frame]
+    }
+
+    pub fn flush(&mut self, frame: usize, camera: &CameraUbo, light: &LightUbo) -> anyhow::Result<()> {
+        self.camera_buffers[frame].write(std::slice::from_ref(camera))?;
+        self.light_buffers[frame].write(std::slice::from_ref(light))?;
         Ok(())
     }
 }
 
-impl Drop for GlobalDescriptorSet{
+impl Drop for GlobalDescriptorSet {
     fn drop(&mut self) {
         unsafe {
             self.ctx.device.destroy_descriptor_pool(self.pool, None);
-            self.ctx.device.destroy_descriptor_set_layout(self.set_layout, None);
-    }
+            self.ctx
+                .device
+                .destroy_descriptor_set_layout(self.layout, None);
+        }
     }
 }
