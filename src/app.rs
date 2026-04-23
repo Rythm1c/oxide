@@ -2,7 +2,8 @@ use super::camera::CameraMovement;
 
 use engine_core::{
     context::VkContext,
-    pipeline::{GraphicsPipeline, GraphicsPipelineConfig},
+    descriptor::GlobalDescriptorSet,
+    pipeline::{GraphicsPipeline, GraphicsPipelineConfig, PushConstants},
     renderer::Renderer,
 };
 
@@ -18,9 +19,10 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
 struct VulkanCore {
-    context: Arc<VkContext>,
-    pipeline: GraphicsPipeline,
     renderer: Renderer,
+    pipeline: GraphicsPipeline,
+    globals : GlobalDescriptorSet,
+    context : Arc<VkContext>,
 }
 
 impl VulkanCore {
@@ -32,9 +34,18 @@ impl VulkanCore {
             window.inner_size().height,
         )?);
 
+        let globals = GlobalDescriptorSet::new(
+            Arc::clone(&context.device_ctx),
+            Renderer::MAX_FRAMES_IN_FLIGHT,
+        )?;
+
         let cfg = GraphicsPipelineConfig::default()
             .vertex_shader("shaders/vert.spv")
-            .fragment_shader("shaders/frag.spv");
+            .fragment_shader("shaders/frag.spv")
+            .cull_mode(ash::vk::CullModeFlags::BACK)
+            .polygon_mode(ash::vk::PolygonMode::FILL)
+            .descriptor_layouts(vec![globals.layout()])
+            .push_constant_ranges(vec![PushConstants::push_range()]);
 
         let pipeline = GraphicsPipeline::create(&cfg, Arc::clone(&context))?;
 
@@ -44,21 +55,23 @@ impl VulkanCore {
             context,
             pipeline,
             renderer,
+            globals,
         })
     }
 }
 
 impl Drop for VulkanCore {
     fn drop(&mut self) {
+        
         unsafe { self.context.device().device_wait_idle().unwrap() };
     }
 }
 
 #[derive(Default)]
 struct App {
-    window: Option<Window>,
-    vulkan_core: Option<VulkanCore>,
-    scene: Option<Scene>,
+    window         : Option<Window>,
+    vulkan_core    : Option<VulkanCore>,
+    scene          : Option<Scene>,
     last_frame_time: Option<std::time::Instant>,
 }
 
@@ -85,6 +98,9 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
+                // Drop scene BEFORE vulkan_core to ensure RenderObject buffers
+                // are freed while the allocator is still alive
+                self.scene.take();
                 self.vulkan_core.take();
                 event_loop.exit();
             }
@@ -100,7 +116,17 @@ impl ApplicationHandler for App {
                     if let Some(scene) = &mut self.scene {
                         scene.update(dt);
 
-                        match core.renderer.render(&core.pipeline, scene.objects()) {
+                        let frame = core.renderer.get_current_frame();
+
+                        core.globals.flush(frame, 
+                            &scene.camera_ubo(),
+                            &scene.light_ubo())
+                        .expect("failed to update globals");
+
+                        match core
+                            .renderer
+                            .render(&core.pipeline, &core.globals, scene.objects())
+                        {
                             Ok(_) => {}
                             Err(e) => eprintln!("Render error: {e}"),
                         }
@@ -117,17 +143,17 @@ impl ApplicationHandler for App {
                 event:
                     KeyEvent {
                         physical_key: PhysicalKey::Code(key),
-                        state: ElementState::Pressed,
+                        state       : ElementState::Pressed,
                         ..
                     },
                 ..
             } => {
                 if let Some(scene) = &mut self.scene {
                     match key {
-                        KeyCode::KeyW => scene.move_camera(CameraMovement::Forward),
-                        KeyCode::KeyS => scene.move_camera(CameraMovement::Backward),
-                        KeyCode::KeyA => scene.move_camera(CameraMovement::Left),
-                        KeyCode::KeyD => scene.move_camera(CameraMovement::Right),
+                        KeyCode::KeyW   => scene.move_camera(CameraMovement::Forward),
+                        KeyCode::KeyS   => scene.move_camera(CameraMovement::Backward),
+                        KeyCode::KeyA   => scene.move_camera(CameraMovement::Left),
+                        KeyCode::KeyD   => scene.move_camera(CameraMovement::Right),
                         KeyCode::Escape => {
                             self.vulkan_core.take();
                             event_loop.exit();
@@ -147,12 +173,12 @@ impl ApplicationHandler for App {
     fn device_event(
         &mut self,
         _event_loop: &ActiveEventLoop,
-        _device_id: DeviceId,
-        event: DeviceEvent,
+        _device_id : DeviceId,
+        event      : DeviceEvent,
     ) {
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
             if let Some(scene) = &mut self.scene {
-                scene.rotate_camera(dx as f32, dy as f32);
+                scene.rotate_camera(dx as f32, -dy as f32);
             }
         }
     }
@@ -162,8 +188,7 @@ pub fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new()?;
 
     event_loop.set_control_flow(ControlFlow::Poll);
-    event_loop.set_control_flow(ControlFlow::Wait);
-    
+
     let mut app = App::default();
     event_loop.run_app(&mut app)?;
 

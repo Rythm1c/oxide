@@ -5,11 +5,11 @@
 layout(location = 0) in vec3 o_normal;
 layout(location = 1) in vec2 o_uv;
 layout(location = 2) in vec3 o_color;
+layout(location = 3) in vec3 view_dir;
 
 layout(location = 0) out vec4 uFragColor;
 
 layout(binding = 1) uniform LightUBO {
-    vec4 view_dir;
     vec4 light_dir;
     vec4 light_color;
 } lightUBO;
@@ -27,7 +27,7 @@ void main() {
     vec3 diffuse = lightUBO.light_color.xyz * diff;
 
     //specular
-    vec3 viewDir = normalize(lightUBO.view_dir.xyz);
+    vec3 viewDir = normalize(view_dir);
     vec3 reflectDir = reflect(-lightUBO.light_dir.xyz, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
     vec3 specular = lightUBO.light_color.xyz * spec;

@@ -9,7 +9,7 @@ use super::ubo::{CameraUbo, LightUbo};
 pub struct GlobalDescriptorSet {
     ctx: Arc<DeviceContext>,
 
-    pub layout: vk::DescriptorSetLayout,
+    layout: vk::DescriptorSetLayout,
     pool: vk::DescriptorPool,
     sets: Vec<vk::DescriptorSet>, // one per frame in flight
 
@@ -134,6 +134,10 @@ impl GlobalDescriptorSet {
         })
     }
 
+    pub fn layout(&self) -> vk::DescriptorSetLayout {
+        self.layout
+    }
+
     pub fn set(&self, frame: usize) -> vk::DescriptorSet {
         self.sets[frame]
     }
@@ -147,6 +151,7 @@ impl GlobalDescriptorSet {
 
 impl Drop for GlobalDescriptorSet {
     fn drop(&mut self) {
+
         unsafe {
             self.ctx.device.destroy_descriptor_pool(self.pool, None);
             self.ctx

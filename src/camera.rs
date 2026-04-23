@@ -1,12 +1,15 @@
-use math::mat4::{Mat4, look_at, transpose};
+use math::mat4::{Mat4, look_at, transpose, perspective};
 use math::vec3::{Vec3, cross, vec3};
+use engine_core::ubo::CameraUbo;
 
 pub struct Camera {
-    pub pos        : Vec3,
-    pub up         : Vec3,
+    pos            : Vec3,
+    up             : Vec3,
+    pub fov        : f32,
+    pub aspect     : f32,
     pub speed      : f32,
     pub sensitivity: f32,
-    pub direction  : Vec3,
+    direction      : Vec3,
 }
 
 impl Camera {
@@ -14,10 +17,24 @@ impl Camera {
         Camera {
             pos        : Vec3::new(0.0, 0.0, 3.0),
             up         : Vec3::new(0.0, 1.0, 0.0),
+            fov        : 45.0,
+            aspect     : 800.0 / 600.0,
             speed      : 2.5,
             sensitivity: 0.1,
             direction  : Vec3::new(0.0, 0.0, 0.0),
         }
+    }
+
+    pub fn pos(&self) -> Vec3 {
+        self.pos
+    }
+
+    pub fn up(&self) -> Vec3 {
+        self.up
+    }
+
+    pub fn direction(&self) -> Vec3 {
+        self.direction
     }
 
     pub fn view_matrix(&self) -> Mat4 {
@@ -25,6 +42,12 @@ impl Camera {
         view.data[1][1] *= -1.0; // Invert Y axis for Vulkan's coordinate system
         // vulkan expects column-major order, so we need to transpose the matrix before returning it
         transpose(&view)
+    }
+
+    pub fn projection_matrix(&self) -> Mat4 {
+        let projection = perspective(self.fov, self.aspect, 0.1, 100.0);
+        // vulkan expects column-major order, so we need to transpose the matrix before returning it
+        transpose(&projection)
     }
 
     pub fn rotate(&mut self, yaw: f32, pitch: f32) {
@@ -51,6 +74,15 @@ impl Camera {
                 let right = cross(&self.direction, &self.up).unit();
                 self.pos = self.pos + right * self.speed;
             }
+        }
+    }
+
+    pub fn get_ubo(&self) -> CameraUbo {
+        let dir = self.direction;
+        CameraUbo {
+            view_dir : [dir.x, dir.y, dir.z, 0.0],
+            view     : self.view_matrix().data,
+            proj     : self.projection_matrix().data,
         }
     }
 }

@@ -1,9 +1,9 @@
-use ash::vk;
+use ash::vk::{self, DescriptorSetLayout};
 use std::sync::Arc;
 
 use super::context::VkContext;
-use crate::vertex::Vertex;
 use crate::shader::ShaderModule;
+use crate::vertex::Vertex;
 
 // ---------------------------------------------------------------------------
 // Push constants — 128 bytes guaranteed by the Vulkan spec.
@@ -48,6 +48,14 @@ impl PushConstants {
             )
         }
     }
+
+    pub fn push_range() -> vk::PushConstantRange {
+        vk::PushConstantRange {
+            stage_flags: vk::ShaderStageFlags::VERTEX,
+            offset: 0,
+            size: std::mem::size_of::<Self>() as u32,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -58,8 +66,10 @@ impl PushConstants {
 pub struct GraphicsPipelineConfig {
     vert_shader_path: String,
     frag_shader_path: Option<String>,
-    pub polygon_mode: Option<vk::PolygonMode>,
-    pub cull_mode: Option<vk::CullModeFlags>,
+    polygon_mode: Option<vk::PolygonMode>,
+    cull_mode: Option<vk::CullModeFlags>,
+    descriptor_layouts: Vec<DescriptorSetLayout>,
+    push_ranges: Vec<vk::PushConstantRange>,
 }
 
 impl GraphicsPipelineConfig {
@@ -83,6 +93,16 @@ impl GraphicsPipelineConfig {
     /// Override back-face culling (default: BACK).
     pub fn cull_mode(mut self, mode: vk::CullModeFlags) -> Self {
         self.cull_mode = Some(mode);
+        self
+    }
+
+    pub fn descriptor_layouts(mut self, layouts: Vec<DescriptorSetLayout>) -> Self {
+        self.descriptor_layouts = layouts;
+        self
+    }
+
+    pub fn push_constant_ranges(mut self, ranges: Vec<vk::PushConstantRange>) -> Self {
+        self.push_ranges = ranges;
         self
     }
 }
@@ -115,7 +135,7 @@ impl GraphicsPipeline {
 
         pipeline
             .create_renderpass()
-            .create_layout()
+            .create_layout(config)
             .create_framebuffers()
             .create_pipeline(config)?;
 
@@ -198,20 +218,15 @@ impl GraphicsPipeline {
 
     // --- Pipeline layout (push constants) ----------------------------------
 
-    fn create_layout(&mut self) -> &mut Self {
-        // One push constant range covering our full PushConstants struct
-        let push_constant_range = vk::PushConstantRange {
-            stage_flags: vk::ShaderStageFlags::VERTEX,
-            offset: 0,
-            size: std::mem::size_of::<PushConstants>() as u32,
-        };
+    fn create_layout(&mut self, config: &GraphicsPipelineConfig) -> &mut Self {
 
         self.layout = unsafe {
             self.ctx
                 .device()
                 .create_pipeline_layout(
                     &vk::PipelineLayoutCreateInfo::default()
-                        .push_constant_ranges(std::slice::from_ref(&push_constant_range)),
+                        .set_layouts(&config.descriptor_layouts)
+                        .push_constant_ranges(&config.push_ranges),
                     None,
                 )
                 .expect("Failed to create pipeline layout")
@@ -340,8 +355,8 @@ impl GraphicsPipeline {
             color_write_mask: vk::ColorComponentFlags::RGBA,
             ..Default::default()
         }];
-        let color_blend = vk::PipelineColorBlendStateCreateInfo::default()
-            .attachments(&color_blend_attachments);
+        let color_blend =
+            vk::PipelineColorBlendStateCreateInfo::default().attachments(&color_blend_attachments);
 
         let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
         let dynamic_state =

@@ -1,4 +1,5 @@
 use super::context::{VkContext, record_submit_commandbuffer_no_wait};
+use super::descriptor::GlobalDescriptorSet;
 use super::pipeline::GraphicsPipeline;
 use crate::drawable::RenderObject;
 use ash::vk;
@@ -7,9 +8,7 @@ use std::sync::Arc;
 // ---------------------------------------------------------------------------
 // Renderer
 // ---------------------------------------------------------------------------
-
-const MAX_FRAMES_IN_FLIGHT: usize = 2;
-
+#[derive(Clone)]
 pub struct Renderer {
     context: Arc<VkContext>,
     clear_color: [f32; 4],
@@ -22,6 +21,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
+
     pub fn new(context: Arc<VkContext>) -> Self {
         let device = context.device();
 
@@ -29,7 +30,7 @@ impl Renderer {
             device
                 .allocate_command_buffers(
                     &vk::CommandBufferAllocateInfo::default()
-                        .command_buffer_count(MAX_FRAMES_IN_FLIGHT as u32)
+                        .command_buffer_count(Self::MAX_FRAMES_IN_FLIGHT as u32)
                         .command_pool(context.device_ctx.pool)
                         .level(vk::CommandBufferLevel::PRIMARY),
                 )
@@ -40,11 +41,11 @@ impl Renderer {
         // Start fences signalled so the first frame doesn't wait forever
         let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
 
-        let mut image_available_semaphores = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
-        let mut render_finished_semaphores = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
-        let mut in_flight_fences = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
+        let mut image_available_semaphores = Vec::with_capacity(Self::MAX_FRAMES_IN_FLIGHT);
+        let mut render_finished_semaphores = Vec::with_capacity(Self::MAX_FRAMES_IN_FLIGHT);
+        let mut in_flight_fences = Vec::with_capacity(Self::MAX_FRAMES_IN_FLIGHT);
 
-        for _ in 0..MAX_FRAMES_IN_FLIGHT {
+        for _ in 0..Self::MAX_FRAMES_IN_FLIGHT {
             unsafe {
                 image_available_semaphores
                     .push(device.create_semaphore(&semaphore_info, None).unwrap());
@@ -69,6 +70,9 @@ impl Renderer {
         self.clear_color = color;
     }
 
+    pub fn get_current_frame(&self) -> usize {
+        self.current_frame
+    }
     /// Render one frame.
     ///
     /// Per-object `PushConstants` are uploaded via `cmd_push_constants` for
@@ -76,6 +80,7 @@ impl Renderer {
     pub fn render(
         &mut self,
         pipeline: &GraphicsPipeline,
+        globals: &GlobalDescriptorSet,
         render_objects: &Vec<RenderObject>,
     ) -> anyhow::Result<()> {
         let ctx = &self.context;
@@ -146,6 +151,15 @@ impl Renderer {
                 device.cmd_set_viewport(cmd, 0, &pipeline.viewports);
                 device.cmd_set_scissor(cmd, 0, &pipeline.scissors);
 
+                device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline.layout,
+                    0,
+                    &[globals.set(frame)],
+                    &[],
+                );
+
                 for obj in render_objects.iter() {
                     // Upload this object's MVP + model matrix as push constants.
                     // This is the cheapest way to give each physics body its
@@ -182,7 +196,7 @@ impl Renderer {
             )?;
         }
 
-        self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+        self.current_frame = (self.current_frame + 1) % Self::MAX_FRAMES_IN_FLIGHT;
         Ok(())
     }
 }

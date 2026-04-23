@@ -264,7 +264,7 @@ impl Drop for VkContext {
         unsafe {
             self.device().device_wait_idle().unwrap();
 
-            // *** Drop depth_texture BEFORE destroying the device.
+            // *** CRITICAL: Drop depth_texture BEFORE destroying the device.
             // Texture::drop calls destroy_image_view / free_memory / destroy_image
             // on device_ctx.device — those calls must happen while the device
             // is still alive. Without this explicit drop the Texture would be
@@ -353,18 +353,40 @@ pub fn record_submit_commandbuffer_no_wait<F: FnOnce(&ash::Device, vk::CommandBu
     signal_semaphores: &[vk::Semaphore],
     f: F,
 ) {
-    record_submit_commandbuffer_internal(
-        device,
-        command_buffer,
-        command_buffer_reuse_fence,
-        submit_queue,
-        wait_mask,
-        wait_semaphores,
-        signal_semaphores,
-        false,
-        f,
-    );
+    unsafe {
+        // Caller already waited — reset here so submit can signal it again.
+        device
+            .reset_fences(&[command_buffer_reuse_fence])
+            .expect("Reset fences failed");
+
+        device
+            .reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::RELEASE_RESOURCES)
+            .expect("Reset command buffer failed");
+        device
+            .begin_command_buffer(
+                command_buffer,
+                &vk::CommandBufferBeginInfo::default()
+                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+            )
+            .expect("Begin command buffer failed");
+
+        f(device, command_buffer);
+
+        device.end_command_buffer(command_buffer).expect("End command buffer failed");
+        device
+            .queue_submit(
+                submit_queue,
+                &[vk::SubmitInfo::default()
+                    .wait_semaphores(wait_semaphores)
+                    .wait_dst_stage_mask(wait_mask)
+                    .command_buffers(&[command_buffer])
+                    .signal_semaphores(signal_semaphores)],
+                command_buffer_reuse_fence,
+            )
+            .expect("Queue submit failed");
+    }
 }
+
 
 fn record_submit_commandbuffer_internal<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
     device: &ash::Device,

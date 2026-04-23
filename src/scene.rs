@@ -1,15 +1,18 @@
 use super::camera::{Camera, CameraMovement};
 
 use engine_core::drawable::RenderObject;
+use engine_core::ubo::{CameraUbo, LightUbo};
 
 pub struct Scene {
-    pub camera: Camera,
+    pub light  : Light,
+    pub camera : Camera,
     pub objects: Vec<RenderObject>,
 }
 
 impl Scene {
     pub fn new() -> Self {
         Scene {
+            light: Light::default(),
             camera: Camera::new(),
             objects: Vec::new(),
         }
@@ -45,5 +48,39 @@ impl Scene {
 
     pub fn camera_mut(&mut self) -> &mut Camera {
         &mut self.camera
+    }
+
+    pub fn camera_ubo(&self) -> CameraUbo {
+        self.camera.get_ubo()
+    }
+
+    pub fn light_ubo(&self) -> LightUbo {
+        self.light.get_ubo()
+    } 
+}
+
+pub struct Light {
+    pub color    : [f32; 3],
+    pub direction: [f32; 3],
+}
+
+impl Default for Light {
+    fn default() -> Self {
+        Light {
+            color    : [1.0, 1.0, 1.0],
+            direction: [0.1, -0.5, 0.5],
+        }
+    }
+
+}
+
+impl Light {
+    pub fn get_ubo(&self) -> LightUbo {
+        let dir = self.direction;
+        let col = self.color;
+        LightUbo {
+            light_dir  : [dir[0], dir[1], dir[2], 0.0],
+            light_color: [col[0], col[1], col[2], 1.0],
+        }
     }
 }
