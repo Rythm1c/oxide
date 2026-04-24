@@ -78,6 +78,7 @@ struct App {
     window         : Option<Window>,
     vulkan_core    : Option<VulkanCore>,
     scene          : Option<Scene>,
+    cube           : Option<geometry::Geometry>,
     last_frame_time: Option<std::time::Instant>,
 }
 
@@ -98,7 +99,8 @@ impl ApplicationHandler for App {
 
         // Create and setup the scene
         self.scene = Some(Scene::new());
-        let cube = geometry::Geometry::new(geometry::GeometryType::Cube { size: 1.0, color: None });
+        self.cube = Some(geometry::Geometry::new(geometry::GeometryType::Cube { size: 1.0, color: None }));
+        let cube = self.cube.as_ref().unwrap();
         self.scene.as_mut().unwrap().add_object(RenderObject{
             vertex_buffer: cube.vertex_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap(),
             index_buffer: Some(cube.index_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap()),
@@ -212,8 +214,7 @@ pub fn run() -> anyhow::Result<()> {
 
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = App::default();
-    event_loop.run_app(&mut app)?;
+    event_loop.run_app(&mut App::default())?;
 
     Ok(())
 }

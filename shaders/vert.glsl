@@ -15,7 +15,7 @@ layout(set = 0, binding = 0) uniform CameraUBO {
     vec4 view_dir;
     mat4 view;
     mat4 projection;
-} camUBO;
+} camera;
 
 layout(push_constant) uniform PushConstants {
     mat4  model;
@@ -23,12 +23,12 @@ layout(push_constant) uniform PushConstants {
 
 void main() {
     o_normal = normalize(mat3(transpose(inverse(pc.model))) * normal);
-    o_uv = uv;
-    o_color = color;
-    view_dir = camUBO.view_dir.xyz;
+    o_uv     = uv;
+    o_color  = color;
+    view_dir = camera.view_dir.xyz;
 
-    vec4 worldPos = pc.model * vec4(pos, 1.0);
-    vec4 viewPos = camUBO.view * worldPos;
-    gl_Position = camUBO.projection * viewPos;
-
+    /* vec4 worldPos = pc.model * vec4(pos, 1.0);
+    vec4 viewPos  = camera.view * worldPos;
+    gl_Position   = camera.projection * viewPos; */
+    gl_Position = pc.model * vec4(pos, 1.0);
 }
