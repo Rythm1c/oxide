@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 engine-core = { path = "../core" }
 math = { path = "../math" }
+anyhow = "1.0.102"

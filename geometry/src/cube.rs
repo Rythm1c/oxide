@@ -1,6 +1,6 @@
 use engine_core::vertex::Vertex;
 
-pub fn cube(size: f32, color: Option<[f32; 3]>) -> (Vec<Vertex>, Vec<u32>) {
+pub fn generate_cube(size: f32, color: Option<[f32; 3]>) -> (Vec<Vertex>, Vec<u32>) {
     let half_size = size / 2.0;
     //vertices for with normals for each face(+X, -X, +Y, -Y, +Z, -Z)
     // Each face has its own 4 vertices (with normals pointing outwards), so 24 vertices total.

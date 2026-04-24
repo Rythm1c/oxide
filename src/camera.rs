@@ -21,7 +21,7 @@ impl Camera {
             aspect     : 800.0 / 600.0,
             speed      : 2.5,
             sensitivity: 0.1,
-            direction  : Vec3::new(0.0, 0.0, 0.0),
+            direction  : Vec3::new(0.0, 0.0, -1.0),
         }
     }
 

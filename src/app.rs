@@ -1,13 +1,11 @@
 use super::camera::CameraMovement;
 
 use engine_core::{
-    context::VkContext,
-    descriptor::GlobalDescriptorSet,
-    pipeline::{GraphicsPipeline, GraphicsPipelineConfig, PushConstants},
-    renderer::Renderer,
+    context::VkContext, descriptor::GlobalDescriptorSet, drawable::RenderObject, pipeline::{GraphicsPipeline, GraphicsPipelineConfig, PushConstants}, renderer::Renderer
 };
 
 use super::scene::Scene;
+use geometry;
 
 use std::error::Error;
 use std::sync::Arc;
@@ -92,14 +90,21 @@ impl ApplicationHandler for App {
 
         // Create and setup the scene
         self.scene = Some(Scene::new());
+        let cube = geometry::Geometry::new(geometry::GeometryType::Cube { size: 1.0, color: None });
+        self.scene.as_mut().unwrap().add_object(RenderObject{
+            vertex_buffer: cube.vertex_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap(),
+            index_buffer: Some(cube.index_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap()),
+            index_count: cube.index_count() as u32,
+            vertex_count: cube.vertex_count() as u32,
+            push_constants: PushConstants::identity(),
+        });
+
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
-                // Drop scene BEFORE vulkan_core to ensure RenderObject buffers
-                // are freed while the allocator is still alive
                 self.scene.take();
                 self.vulkan_core.take();
                 event_loop.exit();
