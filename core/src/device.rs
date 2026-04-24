@@ -12,7 +12,7 @@ pub struct DeviceContext {
     pub graphics_queue: vk::Queue,
     pub graphics_queue_index: u32,
 
-    pub allocator: Mutex<Allocator>,
+/*     pub allocator: Mutex<Allocator>, */
     pub pool: vk::CommandPool,
 }
 
@@ -30,11 +30,6 @@ impl DeviceContext {
         let device_memory_properties =
             unsafe { instance.get_physical_device_memory_properties(physical_device) };
 
-        let allocator = Allocator::new(AllocatorCreateInfo {
-            instance: instance.clone(),
-            device: device.clone(),
-            physical_device,
-        })?;
 
         Ok(Self {
             device,
@@ -43,7 +38,6 @@ impl DeviceContext {
             device_memory_properties,
             graphics_queue,
             graphics_queue_index,
-            allocator: Mutex::new(allocator),
             pool,
         })
     }

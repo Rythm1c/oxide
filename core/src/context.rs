@@ -263,22 +263,14 @@ impl Drop for VkContext {
     fn drop(&mut self) {
         unsafe {
             self.device().device_wait_idle().unwrap();
-
-            // *** CRITICAL: Drop depth_texture BEFORE destroying the device.
-            // Texture::drop calls destroy_image_view / free_memory / destroy_image
-            // on device_ctx.device — those calls must happen while the device
-            // is still alive. Without this explicit drop the Texture would be
-            // destroyed AFTER destroy_device() via Rust's field drop order,
-            // causing the VkImage/VkDeviceMemory validation errors. ***
+            
             drop(self.depth_texture.take());
-
             self.device().destroy_fence(self.setup_commands_reuse_fence, None);
             self.swapchain_ctx.destroy(self.device());
             self.device().destroy_command_pool(self.device_ctx.pool, None);
             self.device().destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
-            self.debug_utils_loader
-                .destroy_debug_utils_messenger(self.debug_callback, None);
+            self.debug_utils_loader.destroy_debug_utils_messenger(self.debug_callback, None);
             self.instance.destroy_instance(None);
         }
     }

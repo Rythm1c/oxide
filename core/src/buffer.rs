@@ -1,5 +1,5 @@
-use super::device::DeviceContext;
-use crate::allocator::Allocation;
+use crate::device::DeviceContext;
+use crate::utils::find_memorytype_index;
 
 use ash::vk;
 use gpu_allocator::MemoryLocation;
@@ -67,7 +67,7 @@ impl BufferUsage {
 pub struct Buffer {
     ctx: Arc<DeviceContext>,
     pub(crate) raw: vk::Buffer,
-    allocation: Option<Allocation>, // Option so we can move out in Drop
+    memory: vk::DeviceMemory,
     pub size: vk::DeviceSize,
     pub usage: BufferUsage,
 }
@@ -116,23 +116,23 @@ impl Buffer {
 
     /// Map and write `data` into a CPU-visible buffer.
     pub fn write<T: Copy>(&mut self, data: &[T]) -> anyhow::Result<()> {
-        let alloc = self
-            .allocation
-            .as_mut()
-            .ok_or_else(|| anyhow::anyhow!("Buffer has no allocation"))?;
+        let size = std::mem::size_of_val(data) as vk::DeviceSize;
 
-        let dst = alloc.mapped_slice_mut().ok_or_else(|| {
-            anyhow::anyhow!(
-                "Buffer is not CPU-visible; cannot write directly. \
-                Use a staging buffer for GPU-only buffers."
-            )
-        })?;
-
-        let src = unsafe {
-            std::slice::from_raw_parts(data.as_ptr() as *const u8, std::mem::size_of_val(data))
+        let ptr = unsafe {
+            self.ctx
+                .device
+                .map_memory(self.memory, 0, size, vk::MemoryMapFlags::empty())?
         };
 
-        dst[..src.len()].copy_from_slice(src);
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                data.as_ptr() as *const u8,
+                ptr as *mut u8,
+                size as usize,
+            );
+
+            self.ctx.device.unmap_memory(self.memory);
+        }
         Ok(())
     }
 
@@ -143,24 +143,53 @@ impl Buffer {
         size: vk::DeviceSize,
         usage: BufferUsage,
     ) -> anyhow::Result<Self> {
-        Self::new_with_location(ctx, size, usage, usage.preferred_memory_location())
+        Self::new_with_location(ctx, size, usage)
     }
 
     /// A CpuToGpu staging buffer (TRANSFER_SRC only, always CPU-visible).
     fn new_staging(ctx: Arc<DeviceContext>, size: vk::DeviceSize) -> anyhow::Result<Self> {
-        Self::new_with_location(
+        // Staging buffers are always CPU-visible (CpuToGpu), regardless of the
+        // TRANSFER_SRC usage flag which isn't in the is_cpu_visible() set.
+        let buffer_info = vk::BufferCreateInfo::default()
+            .size(size)
+            .usage(vk::BufferUsageFlags::TRANSFER_SRC)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
+
+        let raw = unsafe { ctx.device.create_buffer(&buffer_info, None)? };
+        let requirements = unsafe { ctx.device.get_buffer_memory_requirements(raw) };
+
+        // Staging buffers MUST be CPU-visible
+        let memory_properties = vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
+
+        let memory_type_index = find_memorytype_index(
+            &requirements,
+            &ctx.device_memory_properties,
+            memory_properties,
+        );
+
+        let alloc_info = vk::MemoryAllocateInfo::default()
+            .allocation_size(requirements.size)
+            .memory_type_index(memory_type_index.expect("could not find memory index!"));
+
+        let memory = unsafe { ctx.device.allocate_memory(&alloc_info, None)? };
+
+        unsafe {
+            ctx.device.bind_buffer_memory(raw, memory, 0)?;
+        }
+
+        Ok(Self {
             ctx,
+            raw,
+            memory,
             size,
-            BufferUsage::TRANSFER_SRC,
-            MemoryLocation::CpuToGpu,
-        )
+            usage: BufferUsage::TRANSFER_SRC,
+        })
     }
 
     fn new_with_location(
         ctx: Arc<DeviceContext>,
         size: vk::DeviceSize,
         usage: BufferUsage,
-        location: MemoryLocation,
     ) -> anyhow::Result<Self> {
         let buffer_info = vk::BufferCreateInfo::default()
             .size(size)
@@ -170,19 +199,32 @@ impl Buffer {
         let raw = unsafe { ctx.device.create_buffer(&buffer_info, None)? };
         let requirements = unsafe { ctx.device.get_buffer_memory_requirements(raw) };
 
-        let mut allocator = ctx.allocator.lock().unwrap();
-        let allocation = allocator.allocate("buffer", requirements, location)?;
-        drop(allocator);
+        let memory_properties = if usage.is_cpu_visible() {
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
+        } else {
+            vk::MemoryPropertyFlags::DEVICE_LOCAL
+        };
+
+        let memory_type_index = find_memorytype_index(
+            &requirements,
+            &ctx.device_memory_properties,
+            memory_properties,
+        );
+
+        let alloc_info = vk::MemoryAllocateInfo::default()
+            .allocation_size(requirements.size)
+            .memory_type_index(memory_type_index.expect("could not find memory index!"));
+
+        let memory = unsafe { ctx.device.allocate_memory(&alloc_info, None)? };
 
         unsafe {
-            ctx.device
-                .bind_buffer_memory(raw, allocation.memory(), allocation.offset())?;
+            ctx.device.bind_buffer_memory(raw, memory, 0)?;
         }
 
         Ok(Self {
             ctx,
             raw,
-            allocation: Some(allocation),
+            memory,
             size,
             usage,
         })
@@ -191,13 +233,10 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
-        if let Some(allocation) = self.allocation.take() {
-            let mut allocator = self.ctx.allocator.lock().unwrap();
-            if let Err(e) = allocator.free(allocation) {
-                eprintln!("Warning: failed to free buffer allocation: {e}");
-            }
+        unsafe {
+            self.ctx.device.destroy_buffer(self.raw, None);
+            self.ctx.device.free_memory(self.memory, None);
         }
-        unsafe { self.ctx.device.destroy_buffer(self.raw, None) };
     }
 }
 

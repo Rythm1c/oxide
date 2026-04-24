@@ -38,16 +38,17 @@ impl Camera {
     }
 
     pub fn view_matrix(&self) -> Mat4 {
-        let mut view = look_at(&self.pos, &(self.pos + self.direction), &self.up);
-        view.data[1][1] *= -1.0; // Invert Y axis for Vulkan's coordinate system
+        let view = look_at(&self.pos, &(self.pos + self.direction), &self.up);
         // vulkan expects column-major order, so we need to transpose the matrix before returning it
         transpose(&view)
     }
 
     pub fn projection_matrix(&self) -> Mat4 {
-        let projection = perspective(self.fov, self.aspect, 0.1, 100.0);
         // vulkan expects column-major order, so we need to transpose the matrix before returning it
-        transpose(&projection)
+        let mut projection = transpose(&perspective(self.fov, self.aspect, 0.1, 100.0));
+        projection.data[1][1] *= -1.0; // Invert Y axis for Vulkan's coordinate system
+
+        projection
     }
 
     pub fn rotate(&mut self, yaw: f32, pitch: f32) {

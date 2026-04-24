@@ -7,14 +7,14 @@ use super::ubo::{CameraUbo, LightUbo};
 
 // global set for the camera and light UBOs, which are shared across all draw calls
 pub struct GlobalDescriptorSet {
-    ctx: Arc<DeviceContext>,
+    ctx           : Arc<DeviceContext>,
 
-    layout: vk::DescriptorSetLayout,
-    pool: vk::DescriptorPool,
-    sets: Vec<vk::DescriptorSet>, // one per frame in flight
+    layout        : vk::DescriptorSetLayout,
+    pool          : vk::DescriptorPool,
+    sets          : Vec<vk::DescriptorSet>, // one per frame in flight
 
     camera_buffers: Vec<Buffer>,
-    light_buffers: Vec<Buffer>,
+    light_buffers : Vec<Buffer>,
 }
 
 impl GlobalDescriptorSet {
@@ -151,12 +151,14 @@ impl GlobalDescriptorSet {
 
 impl Drop for GlobalDescriptorSet {
     fn drop(&mut self) {
+        // Drop buffers FIRST - they hold GPU memory allocations that must be freed
+        // while the allocator is still alive and valid
+        self.camera_buffers.clear();
+        self.light_buffers.clear();
 
         unsafe {
             self.ctx.device.destroy_descriptor_pool(self.pool, None);
-            self.ctx
-                .device
-                .destroy_descriptor_set_layout(self.layout, None);
+            self.ctx.device.destroy_descriptor_set_layout(self.layout, None);
         }
     }
 }

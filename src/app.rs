@@ -1,10 +1,16 @@
 use super::camera::CameraMovement;
+use super::scene::Scene;
 
 use engine_core::{
-    context::VkContext, descriptor::GlobalDescriptorSet, drawable::RenderObject, pipeline::{GraphicsPipeline, GraphicsPipelineConfig, PushConstants}, renderer::Renderer
+    context::VkContext, 
+    descriptor::GlobalDescriptorSet, 
+    drawable::RenderObject, pipeline::{
+        GraphicsPipeline, 
+        GraphicsPipelineConfig, 
+        PushConstants}, 
+    renderer::Renderer
 };
 
-use super::scene::Scene;
 use geometry;
 
 use std::error::Error;
@@ -36,7 +42,7 @@ impl VulkanCore {
             Arc::clone(&context.device_ctx),
             Renderer::MAX_FRAMES_IN_FLIGHT,
         )?;
-
+        
         let cfg = GraphicsPipelineConfig::default()
             .vertex_shader("shaders/vert.spv")
             .fragment_shader("shaders/frag.spv")
@@ -50,18 +56,20 @@ impl VulkanCore {
         let renderer = Renderer::new(Arc::clone(&context));
 
         Ok(VulkanCore {
+            globals,
             context,
             pipeline,
             renderer,
-            globals,
+            
         })
     }
 }
 
 impl Drop for VulkanCore {
     fn drop(&mut self) {
-        
-        unsafe { self.context.device().device_wait_idle().unwrap() };
+        unsafe {
+            self.context.device().device_wait_idle().unwrap();
+        };
     }
 }
 
@@ -105,6 +113,12 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
+                
+                // Wait for GPU to finish all rendering before destroying geometry buffers
+                if let Some(ref core) = self.vulkan_core {
+                    unsafe { core.context.device().device_wait_idle().unwrap() };
+                }
+                
                 self.scene.take();
                 self.vulkan_core.take();
                 event_loop.exit();
@@ -160,6 +174,10 @@ impl ApplicationHandler for App {
                         KeyCode::KeyA   => scene.move_camera(CameraMovement::Left),
                         KeyCode::KeyD   => scene.move_camera(CameraMovement::Right),
                         KeyCode::Escape => {
+                            if let Some(ref core) = self.vulkan_core {
+                                unsafe { core.context.device().device_wait_idle().unwrap() };
+                            }
+                            self.scene.take();
                             self.vulkan_core.take();
                             event_loop.exit();
                         }
