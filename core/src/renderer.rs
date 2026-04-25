@@ -113,6 +113,9 @@ impl Renderer {
             )?
         };
 
+        // Use one render-finished semaphore per swapchain image.
+        // The semaphore that signals rendering completion must not be reused
+        // until the corresponding present operation on that image has finished.
         let render_finished = self.render_finished_semaphores[present_index as usize];
 
         let clear_values = [
