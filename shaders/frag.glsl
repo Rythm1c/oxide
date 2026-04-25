@@ -17,7 +17,7 @@ void main() {
     //directional lighting
 
     //ambient
-    vec3 ambient = vec3(0.1, 0.1, 0.1) * lightUBO.light_color.xyz;
+    vec3 ambient = vec3(0.01, 0.01, 0.01) * lightUBO.light_color.xyz;
 
     //diffuse
     vec3 normal  = normalize(o_normal);
