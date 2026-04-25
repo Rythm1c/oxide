@@ -1,88 +1,110 @@
+use crate::object::Object;
+
 use super::camera::Camera;
 
 use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
+use std::sync::Mutex;
 
 pub struct Scene {
     pub light: Light,
-    pub camera: Camera,
-    pub objects: Vec<RenderObject>,
+    pub camera: Mutex<Camera>,
+    pub objects: Mutex<Vec<Object>>,
 }
 
 impl Scene {
+    /// Creates a new Scene with default camera and light.
     pub fn new() -> Self {
         Scene {
             light: Light::default(),
-            camera: Camera::new(800.0 / 600.0),
-            objects: Vec::new(),
+            camera: Mutex::new(Camera::new(800.0 / 600.0)),
+            objects: Mutex::new(Vec::new()),
         }
     }
 
-    pub fn add_object(&mut self, object: RenderObject) {
-        self.objects.push(object);
+    /// Adds an object to the scene (thread-safe).
+    pub fn add_object(&self, object: Object) {
+        self.objects.lock().unwrap().push(object);
     }
 
-    pub fn objects(&self) -> &Vec<RenderObject> {
-        &self.objects
+    /// Returns render objects for all scene objects.
+    pub fn render_objects(&self) -> Vec<RenderObject> {
+        self.objects
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|obj| obj.get_render_object().ok())
+            .collect()
     }
 
-    pub fn objects_mut(&mut self) -> &mut Vec<RenderObject> {
-        &mut self.objects
+    /// Returns a reference to the scene's camera.
+    pub fn camera(&self) -> Camera {
+        *self.camera.lock().unwrap()
     }
 
-    pub fn camera(&self) -> &Camera {
-        &self.camera
-    }
-
-    pub fn handle_keyboard(&mut self, key: winit::keyboard::KeyCode, pressed: bool) {
+    /// Handles keyboard input for camera control.
+    pub fn handle_keyboard(&self, key: winit::keyboard::KeyCode, pressed: bool) {
         if !pressed {
-            self.camera.set_motion_still();
+            self.camera.lock().unwrap().set_motion_still();
             return; // Only handle key press, not release
         }
 
+        let mut cam = self.camera.lock().unwrap();
         match key {
             winit::keyboard::KeyCode::KeyW => {
-                self.camera.set_motion_forwards();
+                cam.set_motion_forwards();
             }
             winit::keyboard::KeyCode::KeyS => {
-                self.camera.set_motion_backwards();
+                cam.set_motion_backwards();
             }
             winit::keyboard::KeyCode::KeyA => {
-                self.camera.set_motion_left();
+                cam.set_motion_left();
             }
             winit::keyboard::KeyCode::KeyD => {
-                self.camera.set_motion_right();
+                cam.set_motion_right();
             }
             winit::keyboard::KeyCode::Space => {
-                self.camera.set_motion_up();
+                cam.set_motion_up();
             }
             winit::keyboard::KeyCode::ControlLeft | winit::keyboard::KeyCode::ControlRight => {
-                self.camera.set_motion_down();
+                cam.set_motion_down();
             }
 
             _ => {}
         }
     }
 
-    pub fn update(&mut self, delta_time: f32) {
-        self.camera.update(delta_time);
+    /// Updates the scene for the current frame.
+    pub fn update(&self, delta_time: f32) {
+        self.camera.lock().unwrap().update(delta_time);
         // Placeholder for any per-frame scene updates (e.g. animations)
     }
 
-    pub fn rotate_camera(&mut self, yaw: f32, pitch: f32) {
-        self.camera.rotate(yaw, pitch);
+    /// Rotates the camera based on mouse movement.
+    pub fn rotate_camera(&self, yaw: f32, pitch: f32) {
+        self.camera.lock().unwrap().rotate(yaw, pitch);
     }
 
-    pub fn camera_mut(&mut self) -> &mut Camera {
-        &mut self.camera
-    }
-
+    /// Returns camera UBO data.
     pub fn camera_ubo(&self) -> CameraUbo {
-        self.camera.get_ubo()
+        self.camera.lock().unwrap().get_ubo()
     }
 
+    /// Returns light UBO data.
     pub fn light_ubo(&self) -> LightUbo {
         self.light.get_ubo()
+    }
+
+    /// Uploads all scene objects to GPU in batch.
+    /// Call this once after adding all objects, typically right before rendering.
+    pub fn upload_all_objects(&self, device_ctx: std::sync::Arc<engine_core::device::DeviceContext>) -> anyhow::Result<()> {
+        let mut objects = self.objects.lock().unwrap();
+        for obj in objects.iter_mut() {
+            if !obj.is_uploaded() {
+                obj.upload_to_gpu(std::sync::Arc::clone(&device_ctx))?;
+            }
+        }
+        Ok(())
     }
 }
 

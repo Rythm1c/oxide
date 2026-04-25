@@ -3,7 +3,6 @@ use super::scene::Scene;
 use engine_core::{
     context::VkContext, 
     descriptor::GlobalDescriptorSet, 
-    drawable::RenderObject, 
     pipeline::{
         GraphicsPipeline, 
         GraphicsPipelineConfig, 
@@ -12,15 +11,13 @@ use engine_core::{
     renderer::Renderer
 };
 
-use geometry;
-
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Instant;
 
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
@@ -75,28 +72,31 @@ impl Drop for VulkanCore {
     }
 }
 
-
-struct App {
+/// Application state managing Vulkan rendering and scene updates.
+pub struct App {
     window           : Option<Window>,
     vulkan_core      : Option<VulkanCore>,
-    scene            : Option<Scene>,
-    cube             : Option<geometry::Geometry>,
+    scene            : Option<Arc<Scene>>,
     last_frame_time  : Option<Instant>,
     is_mouse_dragging: bool,
     last_mouse_pos   : (f64, f64),
 }
 
-impl Default for App {
-    fn default() -> Self {
+impl App {
+    /// Creates a new App with a reference to the scene.
+    pub fn new() -> Self {
         Self {
             window           : None,
             vulkan_core      : None,
             scene            : None,
-            cube             : None,
             last_frame_time  : None,
             is_mouse_dragging: false,
             last_mouse_pos   : (0.0, 0.0),
         }
+    }
+
+    pub fn set_scene(&mut self, scene: Arc<Scene>) {
+        self.scene = Some(scene);
     }
 }
 
@@ -115,18 +115,15 @@ impl ApplicationHandler for App {
         self.vulkan_core =
             Some(VulkanCore::new("Vulkan App", self.window.as_ref().unwrap()).unwrap());
 
-        // Create and setup the scene
-        self.scene = Some(Scene::new());
-        self.cube = Some(geometry::Geometry::new(geometry::GeometryType::Cube { size: 2.0, color: None }));
-        let cube = self.cube.as_ref().unwrap();
-        self.scene.as_mut().unwrap().add_object(RenderObject{
-            vertex_buffer: cube.vertex_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap(),
-            index_buffer: Some(cube.index_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap()),
-            index_count: cube.index_count() as u32,
-            vertex_count: cube.vertex_count() as u32,
-            push_constants: PushConstants::identity(),
-        });
-
+        // Upload all scene objects to GPU
+        if let Some(core) = &self.vulkan_core {
+            let device_ctx = Arc::clone(&core.context.device_ctx);
+            if let Some(scene) = &self.scene {
+                if let Err(e) = scene.upload_all_objects(device_ctx) {
+                    eprintln!("Failed to upload scene objects: {}", e);
+                }
+            }
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -138,8 +135,7 @@ impl ApplicationHandler for App {
                 if let Some(ref core) = self.vulkan_core {
                     unsafe { core.context.device().device_wait_idle().unwrap() };
                 }
-                
-                self.scene.take();
+                self.scene.take(); // Drop scene and its objects before Vulkan context
                 self.vulkan_core.take();
                 event_loop.exit();
             }
@@ -152,9 +148,8 @@ impl ApplicationHandler for App {
                 self.last_frame_time = Some(now);
 
                 if let Some(core) = &mut self.vulkan_core {
-                    if let Some(scene) = &mut self.scene {
+                    if let Some(scene) = &self.scene {
                         scene.update(dt);
-
                         let frame = core.renderer.get_current_frame();
 
                         core.globals.flush(frame, 
@@ -164,7 +159,7 @@ impl ApplicationHandler for App {
 
                         match core
                             .renderer
-                            .render(&core.pipeline, &core.globals, scene.objects())
+                            .render(&core.pipeline, &core.globals, &scene.render_objects())
                         {
                             Ok(_) => {}
                             Err(e) => eprintln!("Render error: {e}"),
@@ -180,12 +175,13 @@ impl ApplicationHandler for App {
 
             winit::event::WindowEvent::KeyboardInput { event, .. } => {
                 if let PhysicalKey::Code(code) = event.physical_key {
-                    if let Some(scene) = self.scene.as_mut() {
+                    if let Some(scene) = &self.scene {
                         scene.handle_keyboard(
                             code,
                             event.state == winit::event::ElementState::Pressed,
                         );
                     }
+                    
                 }
             }
 
@@ -203,9 +199,9 @@ impl ApplicationHandler for App {
                     let dx = (position.x - self.last_mouse_pos.0) as f32;
                     let dy = (position.y - self.last_mouse_pos.1) as f32;
 
-                    if let Some(scene) = &mut self.scene {
-                scene.rotate_camera(dx as f32, dy as f32);
-            }
+                    if let Some(scene) = &self.scene {
+                        scene.rotate_camera(dx, dy);
+                    }
                 }
                 self.last_mouse_pos = (position.x, position.y);
             }
@@ -218,9 +214,10 @@ impl ApplicationHandler for App {
 
 }
 
-pub fn run() -> anyhow::Result<()> {
-    let event_loop = EventLoop::new()?;
+/// Runs the application event loop.
+pub fn run(mut app: App) -> anyhow::Result<()> {
+    let event_loop = winit::event_loop::EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
-    event_loop.run_app(&mut App::default())?;
+    event_loop.run_app(&mut app)?;
     Ok(())
 }

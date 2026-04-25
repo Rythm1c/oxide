@@ -9,7 +9,7 @@ pub fn generate_cube(size: f32, color: Option<[f32; 3]>) -> (Vec<Vertex>, Vec<u3
     let face_colors = [
         [0.0, 0.0, 1.0], // +X face - blue
         [0.0, 0.0, 1.0], // -X face - blue
-        [1.0, 1.0, 0.0], // -Y face - yellow
+        [1.0, 1.0, 0.0], // +Y face - yellow
         [1.0, 1.0, 0.0], // -Y face - yellow
         [1.0, 0.0, 0.0], // +Z face - red
         [1.0, 0.0, 0.0], // -Z face - red

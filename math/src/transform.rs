@@ -7,6 +7,12 @@ pub struct Transform {
     pub orientation: Quat,
 }
 
+impl Default for Transform {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 impl Transform {
     pub const DEFAULT: Self = Self {
         translation: Vec3::ZERO,
