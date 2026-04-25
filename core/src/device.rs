@@ -1,8 +1,5 @@
 use ash::{Instance, vk};
 
-use std::sync::Mutex;
-
-use crate::allocator::{Allocator, AllocatorCreateInfo};
 pub struct DeviceContext {
     pub device: ash::Device,
     pub physical_device: vk::PhysicalDevice,
