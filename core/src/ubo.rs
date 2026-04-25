@@ -1,9 +1,9 @@
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct CameraUbo {
-    pub view_dir: [f32; 4],
     pub view    : [[f32; 4]; 4],
     pub proj    : [[f32; 4]; 4],
+    pub view_dir: [f32; 4],
 }
 
 impl Default for CameraUbo {

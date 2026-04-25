@@ -7,7 +7,7 @@ layout(location = 3) in vec3 view_dir;
 
 layout(location = 0) out vec4 uFragColor;
 
-layout(binding = 1) uniform LightUBO {
+layout(set = 0, binding = 1) uniform LightUBO {
     vec4 light_dir;
     vec4 light_color;
 } lightUBO;

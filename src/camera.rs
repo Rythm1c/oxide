@@ -25,6 +25,7 @@ pub struct Camera {
     orientation: Quat,
     pitch      : f32,
     yaw        : f32,
+    up         : Vec3,
 
     // Projection
     aspect_ratio: f32,
@@ -36,15 +37,17 @@ pub struct Camera {
     motion     : CameraMotion,
     sensitivity: f32,
     speed      : f32,
+
 }
 
 impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
         Self {
-            pos        : vec3(0.0, 3.0, -10.0),
+            pos        : vec3(0.0, 0.0, -10.0),
             orientation: Quat::ZERO,
             pitch      : 0.0,
             yaw        : 0.0,
+            up         : -Vec3::Y,
 
             aspect_ratio,
 
@@ -59,8 +62,8 @@ impl Camera {
 
     // ==================== Input Handling ====================
     pub fn rotate(&mut self, dx: f32, dy: f32) {
-        self.yaw += -dx * self.sensitivity;
-        self.pitch += dy * self.sensitivity;
+        self.yaw   += dx * self.sensitivity;
+        self.pitch += -dy * self.sensitivity;
 
         // Clamp pitch to avoid flipping
         self.pitch = self.pitch.clamp(-89.0, 89.0);
@@ -117,12 +120,13 @@ impl Camera {
     }
 
     fn strafe(&mut self, delta: f32) {
-        let right = cross(&self.get_forward(), &Vec3::Y);
+        let right = cross(&self.get_forward(), &self.up).unit();
+        self.up = cross(&right, &self.get_forward()).unit();
         self.pos = self.pos + right * self.speed * delta;
     }
 
     fn move_up(&mut self, delta: f32) {
-        self.pos.y += self.speed * delta;
+        self.pos = self.pos + self.up * self.speed * delta;
     }
 
     // ==================== Getters ====================
@@ -135,12 +139,15 @@ impl Camera {
     }
 
     pub fn view_matrix(&self) -> Mat4x4 {
-        mat4x4::look_at(self.pos, self.pos + self.get_forward(), Vec3::Y)
+        let view = mat4x4::look_at(self.pos, self.pos + self.get_forward(), self.up);
+
+        mat4x4::transpose(&view) // Transpose for column-major order
     }
 
     pub fn projection_matrix(&self) -> Mat4x4 {
         let mut projection = mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
-        
+        projection = mat4x4::transpose(&projection); // Transpose for column-major order
+
         projection.data[1][1] *= -1.0; // Flip Y for Vulkan's coordinate system
 
         projection
@@ -167,9 +174,9 @@ impl Camera {
         let dir = self.get_forward();
 
         CameraUbo {
+            view     : self.view_matrix().data,
+            proj     : self.projection_matrix().data,
             view_dir : [dir.x, dir.y, dir.z, 0.0],
-            view     : mat4x4::transpose(&self.view_matrix()).data,
-            proj     : mat4x4::transpose(&self.projection_matrix()).data,
         }
     }
 }

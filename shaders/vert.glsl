@@ -12,9 +12,9 @@ layout(location = 2) out vec3 o_color;
 layout(location = 3) out vec3 view_dir;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
-    vec4 view_dir;
     mat4 view;
     mat4 projection;
+    vec4 view_dir;
 } camera;
 
 layout(push_constant) uniform PushConstants {
