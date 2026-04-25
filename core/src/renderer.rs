@@ -40,17 +40,23 @@ impl Renderer {
         // Start fences signalled so the first frame doesn't wait forever
         let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
 
+        let swapchain_image_count = context.present_image_views().len();
         let mut image_available_semaphores = Vec::with_capacity(Self::MAX_FRAMES_IN_FLIGHT);
-        let mut render_finished_semaphores = Vec::with_capacity(Self::MAX_FRAMES_IN_FLIGHT);
+        let mut render_finished_semaphores = Vec::with_capacity(swapchain_image_count);
         let mut in_flight_fences = Vec::with_capacity(Self::MAX_FRAMES_IN_FLIGHT);
 
         for _ in 0..Self::MAX_FRAMES_IN_FLIGHT {
             unsafe {
                 image_available_semaphores
                     .push(device.create_semaphore(&semaphore_info, None).unwrap());
+                in_flight_fences.push(device.create_fence(&fence_info, None).unwrap());
+            }
+        }
+
+        for _ in 0..swapchain_image_count {
+            unsafe {
                 render_finished_semaphores
                     .push(device.create_semaphore(&semaphore_info, None).unwrap());
-                in_flight_fences.push(device.create_fence(&fence_info, None).unwrap());
             }
         }
 
@@ -88,7 +94,6 @@ impl Renderer {
 
         let cmd = self.draw_command_buffers[frame];
         let image_available = self.image_available_semaphores[frame];
-        let render_finished = self.render_finished_semaphores[frame];
         let fence = self.in_flight_fences[frame];
 
         // IMPORTANT: Wait for this frame's fence BEFORE reusing its semaphores.
@@ -107,6 +112,8 @@ impl Renderer {
                 vk::Fence::null(),
             )?
         };
+
+        let render_finished = self.render_finished_semaphores[present_index as usize];
 
         let clear_values = [
             vk::ClearValue {
