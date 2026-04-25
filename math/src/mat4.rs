@@ -187,7 +187,11 @@ impl Display for Mat4 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[{}, {}, {}, {}]\n[{}, {}, {}, {}]\n[{}, {}, {}, {}]\n[{}, {}, {}, {}]",
+            "
+            [{}, {}, {}, {}]\n
+            [{}, {}, {}, {}]\n
+            [{}, {}, {}, {}]\n
+            [{}, {}, {}, {}]",
             self.data[0][0],
             self.data[0][1],
             self.data[0][2],
