@@ -21,12 +21,13 @@ void main() {
 
     //diffuse
     vec3 normal  = normalize(o_normal);
-    float diff   = max(dot(normal, lightUBO.light_dir.xyz), 0.0);
+    vec3 lightDir = normalize(lightUBO.light_dir.xyz);
+    float diff   = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = lightUBO.light_color.xyz * diff;
 
     //specular
-    vec3 viewDir    = normalize(view_dir);
-    vec3 reflectDir = reflect(-lightUBO.light_dir.xyz, normal);
+    vec3 viewDir    = normalize(-view_dir);  // Negate because view_dir points away from camera
+    vec3 reflectDir = reflect(-lightDir, normal);
     float spec      = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
     vec3 specular   = lightUBO.light_color.xyz * spec;
 
