@@ -53,7 +53,7 @@ impl Camera {
             far        : 100.0,
             motion     : CameraMotion::Still,
             sensitivity: 0.075,
-            speed      : 15.0,
+            speed      : 12.0,
         }
     }
 

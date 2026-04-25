@@ -4,6 +4,8 @@ use super::camera::Camera;
 
 use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
+use math::quaternion::Quat;
+use math::vec3::Vec3;
 use std::sync::Mutex;
 
 pub struct Scene {
@@ -23,8 +25,12 @@ impl Scene {
     }
 
     /// Adds an object to the scene (thread-safe).
-    pub fn add_object(&self, object: Object) {
-        self.objects.lock().unwrap().push(object);
+    pub fn add_object(&self, object: Object, pos: Vec3, scale: Vec3, rot: Quat) {
+        let mut obj = object.clone();
+        obj.transform_mut().translation = pos;
+        obj.transform_mut().scaling = scale;
+        obj.transform_mut().orientation = rot;
+        self.objects.lock().unwrap().push(obj);
     }
 
     /// Returns render objects for all scene objects.
@@ -66,7 +72,8 @@ impl Scene {
             winit::keyboard::KeyCode::Space => {
                 cam.set_motion_up();
             }
-            winit::keyboard::KeyCode::ControlLeft | winit::keyboard::KeyCode::ControlRight => {
+            winit::keyboard::KeyCode::ControlLeft | 
+            winit::keyboard::KeyCode::ControlRight => {
                 cam.set_motion_down();
             }
 

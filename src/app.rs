@@ -181,7 +181,6 @@ impl ApplicationHandler for App {
                             event.state == winit::event::ElementState::Pressed,
                         );
                     }
-                    
                 }
             }
 

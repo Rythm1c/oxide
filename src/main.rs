@@ -9,15 +9,35 @@ mod scene;
 use app::App;
 use scene::Scene;
 
+use math::quaternion::Quat;
+use math::vec3::Vec3;
+
 fn main() -> anyhow::Result<()> {
     // Create the app with the scene reference
     let mut app = App::new();
     // Create the scene
     let scene = Scene::new();
-    scene.add_object(object::Object::new(geometry::Shape::Cube {
-        size: 1.0,
-        color: None,
-    }));
+    scene.add_object(
+        object::Object::new(geometry::Shape::Cube {
+            size: 1.0,
+            color: None,
+        }),
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(1.0, 1.0, 1.0),
+        Quat::ZERO,
+    );
+
+    scene.add_object(
+        object::Object::new(geometry::Shape::UVSphere {
+            radius: 0.5,
+            segments: 32,
+            rings: 16,
+            color: None,
+        }),
+        Vec3::new(3.0, 0.0, 0.0),
+        Vec3::new(1.0, 1.0, 1.0),
+        Quat::ZERO,
+    );
     app.set_scene(Arc::new(scene));
     // Run the application
     app::run(app)?;
