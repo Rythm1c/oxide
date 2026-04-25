@@ -236,22 +236,22 @@ fn determinant(m: &Mat4) -> f32 {
 fn adjugate(m: &Mat4) -> Mat4 {
     //Cof (M[i, j]) = Minor(M[i, j]]) * pow(-1, i + j)
     let mut cofactor = Mat4::IDENTITY;
-    cofactor.data[0][0] = m4_3x3minor(&m.data, 1, 2, 3, 1, 2, 3);
+    cofactor.data[0][0] =  m4_3x3minor(&m.data, 1, 2, 3, 1, 2, 3);
     cofactor.data[1][0] = -m4_3x3minor(&m.data, 1, 2, 3, 0, 2, 3);
-    cofactor.data[2][0] = m4_3x3minor(&m.data, 1, 2, 3, 0, 1, 3);
+    cofactor.data[2][0] =  m4_3x3minor(&m.data, 1, 2, 3, 0, 1, 3);
     cofactor.data[3][0] = -m4_3x3minor(&m.data, 1, 2, 3, 0, 1, 2);
     cofactor.data[0][1] = -m4_3x3minor(&m.data, 0, 2, 3, 1, 2, 3);
-    cofactor.data[1][1] = m4_3x3minor(&m.data, 0, 2, 3, 0, 2, 3);
+    cofactor.data[1][1] =  m4_3x3minor(&m.data, 0, 2, 3, 0, 2, 3);
     cofactor.data[2][1] = -m4_3x3minor(&m.data, 0, 2, 3, 0, 1, 3);
-    cofactor.data[3][1] = m4_3x3minor(&m.data, 0, 2, 3, 0, 1, 2);
-    cofactor.data[0][2] = m4_3x3minor(&m.data, 0, 1, 3, 1, 2, 3);
+    cofactor.data[3][1] =  m4_3x3minor(&m.data, 0, 2, 3, 0, 1, 2);
+    cofactor.data[0][2] =  m4_3x3minor(&m.data, 0, 1, 3, 1, 2, 3);
     cofactor.data[1][2] = -m4_3x3minor(&m.data, 0, 1, 3, 0, 2, 3);
-    cofactor.data[2][2] = m4_3x3minor(&m.data, 0, 1, 3, 0, 1, 3);
+    cofactor.data[2][2] =  m4_3x3minor(&m.data, 0, 1, 3, 0, 1, 3);
     cofactor.data[3][2] = -m4_3x3minor(&m.data, 0, 1, 3, 0, 1, 2);
     cofactor.data[0][3] = -m4_3x3minor(&m.data, 0, 1, 2, 1, 2, 3);
-    cofactor.data[1][3] = m4_3x3minor(&m.data, 0, 1, 2, 0, 2, 3);
+    cofactor.data[1][3] =  m4_3x3minor(&m.data, 0, 1, 2, 0, 2, 3);
     cofactor.data[2][3] = -m4_3x3minor(&m.data, 0, 1, 2, 0, 1, 3);
-    cofactor.data[3][3] = m4_3x3minor(&m.data, 0, 1, 2, 0, 1, 2);
+    cofactor.data[3][3] =  m4_3x3minor(&m.data, 0, 1, 2, 0, 1, 2);
 
     transpose(&cofactor)
 }
@@ -311,8 +311,8 @@ pub fn rotation_x(angle: f32) -> Mat4 {
     return Mat4 {
         data: [
             [1.0, 0.0, 0.0, 0.0],
-            [0.0, yy, yz, 0.0],
-            [0.0, zy, zz, 0.0],
+            [0.0,  yy,  yz, 0.0],
+            [0.0,  zy,  zz, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ],
     };
@@ -346,8 +346,8 @@ pub fn rotation_z(angle: f32) -> Mat4 {
 
     return Mat4 {
         data: [
-            [xx, xy, 0.0, 0.0],
-            [yx, yy, 0.0, 0.0],
+            [ xx,  xy, 0.0, 0.0],
+            [ yx,  yy, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ],
@@ -391,9 +391,9 @@ pub fn frustrum(l: f32, r: f32, t: f32, b: f32, n: f32, f: f32) -> Mat4 {
 
     Mat4 {
         data: [
-            [xx, 0.0, xz, 0.0],
-            [0.0, yy, yz, 0.0],
-            [0.0, 0.0, zz, zw],
+            [ xx, 0.0,   xz, 0.0],
+            [0.0,  yy,   yz, 0.0],
+            [0.0, 0.0,   zz,  zw],
             [0.0, 0.0, -1.0, 0.0],
         ],
     }
