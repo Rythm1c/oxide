@@ -6,7 +6,7 @@
 
 use super::{mat4::*, vec3::*};
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Quat {
     pub x: f32,
     pub y: f32,
@@ -51,6 +51,18 @@ impl Quat {
         let s = c;
 
         Self { x, y, z, s }
+    }
+
+    pub fn rotation_x(angle: f32) -> Self {
+        Self::create(angle, Vec3::X)
+    }
+
+    pub fn rotation_y(angle: f32) -> Self {
+        Self::create(angle, Vec3::Y)
+    }
+
+    pub fn rotation_z(angle: f32) -> Self {
+        Self::create(angle, Vec3::Z)
     }
 
     pub fn norm(&self) -> f32 {

@@ -1,13 +1,14 @@
-use super::camera::CameraMovement;
 use super::scene::Scene;
 
 use engine_core::{
     context::VkContext, 
     descriptor::GlobalDescriptorSet, 
-    drawable::RenderObject, pipeline::{
+    drawable::RenderObject, 
+    pipeline::{
         GraphicsPipeline, 
         GraphicsPipelineConfig, 
-        PushConstants}, 
+        PushConstants
+    }, 
     renderer::Renderer
 };
 
@@ -15,11 +16,12 @@ use geometry;
 
 use std::error::Error;
 use std::sync::Arc;
+use std::time::Instant;
 
 use winit::application::ApplicationHandler;
-use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
 struct VulkanCore {
@@ -73,13 +75,29 @@ impl Drop for VulkanCore {
     }
 }
 
-#[derive(Default)]
+
 struct App {
-    window         : Option<Window>,
-    vulkan_core    : Option<VulkanCore>,
-    scene          : Option<Scene>,
-    cube           : Option<geometry::Geometry>,
-    last_frame_time: Option<std::time::Instant>,
+    window           : Option<Window>,
+    vulkan_core      : Option<VulkanCore>,
+    scene            : Option<Scene>,
+    cube             : Option<geometry::Geometry>,
+    last_frame_time  : Option<Instant>,
+    is_mouse_dragging: bool,
+    last_mouse_pos   : (f64, f64),
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            window           : None,
+            vulkan_core      : None,
+            scene            : None,
+            cube             : None,
+            last_frame_time  : None,
+            is_mouse_dragging: false,
+            last_mouse_pos   : (0.0, 0.0),
+        }
+    }
 }
 
 impl ApplicationHandler for App {
@@ -99,7 +117,7 @@ impl ApplicationHandler for App {
 
         // Create and setup the scene
         self.scene = Some(Scene::new());
-        self.cube = Some(geometry::Geometry::new(geometry::GeometryType::Cube { size: 1.0, color: None }));
+        self.cube = Some(geometry::Geometry::new(geometry::GeometryType::Cube { size: 2.0, color: None }));
         let cube = self.cube.as_ref().unwrap();
         self.scene.as_mut().unwrap().add_object(RenderObject{
             vertex_buffer: cube.vertex_buffer(Arc::clone(&self.vulkan_core.as_ref().unwrap().context.device_ctx)).unwrap(),
@@ -160,32 +178,36 @@ impl ApplicationHandler for App {
                 }
             }
 
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(key),
-                        state       : ElementState::Pressed,
-                        ..
-                    },
-                ..
-            } => {
-                if let Some(scene) = &mut self.scene {
-                    match key {
-                        KeyCode::KeyW   => scene.move_camera(CameraMovement::Forward),
-                        KeyCode::KeyS   => scene.move_camera(CameraMovement::Backward),
-                        KeyCode::KeyA   => scene.move_camera(CameraMovement::Left),
-                        KeyCode::KeyD   => scene.move_camera(CameraMovement::Right),
-                        KeyCode::Escape => {
-                            if let Some(ref core) = self.vulkan_core {
-                                unsafe { core.context.device().device_wait_idle().unwrap() };
-                            }
-                            self.scene.take();
-                            self.vulkan_core.take();
-                            event_loop.exit();
-                        }
-                        _ => {}
+            winit::event::WindowEvent::KeyboardInput { event, .. } => {
+                if let PhysicalKey::Code(code) = event.physical_key {
+                    if let Some(scene) = self.scene.as_mut() {
+                        scene.handle_keyboard(
+                            code,
+                            event.state == winit::event::ElementState::Pressed,
+                        );
                     }
                 }
+            }
+
+            winit::event::WindowEvent::MouseInput { state, button, .. } => {
+                if button == winit::event::MouseButton::Left {
+                    match state {
+                        ElementState::Pressed  => self.is_mouse_dragging = true,
+                        ElementState::Released => self.is_mouse_dragging = false,
+                    }
+                }
+            }
+
+            winit::event::WindowEvent::CursorMoved { position, .. } => {
+                if self.is_mouse_dragging {
+                    let dx = (position.x - self.last_mouse_pos.0) as f32;
+                    let dy = (position.y - self.last_mouse_pos.1) as f32;
+
+                    if let Some(scene) = &mut self.scene {
+                scene.rotate_camera(dx as f32, dy as f32);
+            }
+                }
+                self.last_mouse_pos = (position.x, position.y);
             }
             WindowEvent::Resized(_) => {
                 // TODO: recreate swapchain on resize
@@ -194,27 +216,11 @@ impl ApplicationHandler for App {
         }
     }
 
-    // Mouse look via raw device events (more reliable than cursor delta)
-    fn device_event(
-        &mut self,
-        _event_loop: &ActiveEventLoop,
-        _device_id : DeviceId,
-        event      : DeviceEvent,
-    ) {
-        if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
-            if let Some(scene) = &mut self.scene {
-                scene.rotate_camera(dx as f32, -dy as f32);
-            }
-        }
-    }
 }
 
 pub fn run() -> anyhow::Result<()> {
     let event_loop = EventLoop::new()?;
-
     event_loop.set_control_flow(ControlFlow::Poll);
-
     event_loop.run_app(&mut App::default())?;
-
     Ok(())
 }

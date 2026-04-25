@@ -27,8 +27,8 @@ void main() {
     o_color  = color;
     view_dir = camera.view_dir.xyz;
 
-    /* vec4 worldPos = pc.model * vec4(pos, 1.0);
+    vec4 worldPos = pc.model * vec4(pos, 1.0);
     vec4 viewPos  = camera.view * worldPos;
-    gl_Position   = camera.projection * viewPos; */
-    gl_Position = pc.model * vec4(pos, 1.0);
+    gl_Position   = camera.projection * viewPos;
+    //gl_Position = pc.model * vec4(pos, 1.0);
 }

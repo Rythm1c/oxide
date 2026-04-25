@@ -1,6 +1,6 @@
 use super::misc::*;
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -18,6 +18,24 @@ impl Vec3 {
         x: 1.0,
         y: 1.0,
         z: 1.0,
+    };
+
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
+
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
+
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
     };
 
     pub fn new(x: f32, y: f32, z: f32) -> Self {
@@ -39,7 +57,7 @@ impl Vec3 {
         (self.x.powf(2.0) + self.y.powf(2.0) + self.z.powf(2.0)).sqrt()
     }
 
-    // get the vector normalized
+    // get the normalized vector
     pub fn unit(&self) -> Self {
         let inverse_legth = 1.0 / self.len();
         Self {

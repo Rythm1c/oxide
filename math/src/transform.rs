@@ -1,9 +1,9 @@
 use super::{mat4::*, quaternion::*, vec3::*};
 
-#[derive(Clone, Debug, Copy, Default)]
+#[derive(Clone, Debug, Copy)]
 pub struct Transform {
     pub translation: Vec3,
-    pub scaling: Vec3,
+    pub scaling    : Vec3,
     pub orientation: Quat,
 }
 
@@ -11,7 +11,7 @@ impl Transform {
     pub const DEFAULT: Self = Self {
         translation: Vec3::ZERO,
         orientation: Quat::ZERO,
-        scaling: Vec3::ONE,
+        scaling    : Vec3::ONE,
     };
 
     pub fn new(scaling: Vec3, translation: Vec3, orientation: Quat) -> Self {
@@ -25,7 +25,7 @@ impl Transform {
     pub fn lerp(&self, other: &Self, factor: f32) -> Transform {
         Self {
             translation: self.translation.mix(other.translation, factor),
-            scaling: self.scaling.mix(other.scaling, factor),
+            scaling    : self.scaling.mix(other.scaling, factor),
             orientation: self.orientation.nlerp(other.orientation, factor),
         }
     }
@@ -60,7 +60,7 @@ impl Transform {
 
         transform.translation = translation;
         transform.orientation = orientation;
-        transform.scaling = scaling;
+        transform.scaling     = scaling;
 
         transform
     }
@@ -104,7 +104,7 @@ impl Transform {
     pub fn combine(&self, rhs: &Self) -> Self {
         let mut out = Transform::DEFAULT;
 
-        out.scaling = self.scaling * rhs.scaling;
+        out.scaling     = self.scaling * rhs.scaling;
 
         out.orientation = self.orientation * rhs.orientation;
         //mhhhh have no idea what this is

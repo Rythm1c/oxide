@@ -1,7 +1,11 @@
+// got alot of help from the "gabor szauer - hands on c++ game animation programming packt" book
+// most of this is just the books code translated to rust with a few changes here and there.
+// and https://songho.ca/opengl/ was also pretty helpfull
+
 #![allow(dead_code)]
 use super::{misc::*, quaternion::Quat, vec3::*};
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Mat4 {
     pub data: [[f32; 4]; 4],
 }
@@ -46,6 +50,15 @@ impl Mat4 {
 
     pub fn from(values: &[[f32; 4]; 4]) -> Self {
         Self { data: *values }
+    }
+
+    pub fn flattended(&self) -> [f32; 16] {
+        let data = self.data.as_flattened();
+
+        [
+            data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
+            data[9], data[10], data[11], data[12], data[13], data[14], data[15],
+        ]
     }
     /// changes signs past 180 degrees  
     /// not sure why though
@@ -352,9 +365,9 @@ pub fn rotation_z(angle: f32) -> Mat4 {
 }
 
 /// for camera rotation
-pub fn look_at(eye: &Vec3, front: &Vec3, up: &Vec3) -> Mat4 {
+pub fn look_at(eye: Vec3, front: Vec3, up: Vec3) -> Mat4 {
     // camera direction
-    let cd = (*eye - *front).unit();
+    let cd = (eye - front).unit();
     // get right vector
     let cr = cross(&up, &cd).unit();
     // get up vector

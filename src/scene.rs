@@ -1,11 +1,11 @@
-use super::camera::{Camera, CameraMovement};
+use super::camera::Camera;
 
 use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
 
 pub struct Scene {
-    pub light  : Light,
-    pub camera : Camera,
+    pub light: Light,
+    pub camera: Camera,
     pub objects: Vec<RenderObject>,
 }
 
@@ -13,7 +13,7 @@ impl Scene {
     pub fn new() -> Self {
         Scene {
             light: Light::default(),
-            camera: Camera::new(),
+            camera: Camera::new(800.0 / 600.0),
             objects: Vec::new(),
         }
     }
@@ -34,11 +34,38 @@ impl Scene {
         &self.camera
     }
 
-    pub fn move_camera(&mut self, movement: CameraMovement) {
-        self.camera.move_camera(movement);
+    pub fn handle_keyboard(&mut self, key: winit::keyboard::KeyCode, pressed: bool) {
+        if !pressed {
+            self.camera.set_motion_still();
+            return; // Only handle key press, not release
+        }
+
+        match key {
+            winit::keyboard::KeyCode::KeyW => {
+                self.camera.set_motion_forwards();
+            }
+            winit::keyboard::KeyCode::KeyS => {
+                self.camera.set_motion_backwards();
+            }
+            winit::keyboard::KeyCode::KeyA => {
+                self.camera.set_motion_left();
+            }
+            winit::keyboard::KeyCode::KeyD => {
+                self.camera.set_motion_right();
+            }
+            winit::keyboard::KeyCode::Space => {
+                self.camera.set_motion_up();
+            }
+            winit::keyboard::KeyCode::ControlLeft | winit::keyboard::KeyCode::ControlRight => {
+                self.camera.set_motion_down();
+            }
+
+            _ => {}
+        }
     }
 
     pub fn update(&mut self, delta_time: f32) {
+        self.camera.update(delta_time);
         // Placeholder for any per-frame scene updates (e.g. animations)
     }
 
@@ -56,7 +83,7 @@ impl Scene {
 
     pub fn light_ubo(&self) -> LightUbo {
         self.light.get_ubo()
-    } 
+    }
 }
 
 pub struct Light {
@@ -68,10 +95,9 @@ impl Default for Light {
     fn default() -> Self {
         Light {
             color    : [1.0, 1.0, 1.0],
-            direction: [0.1, -0.5, 0.5],
+            direction: [0.1, -1.0, -0.5],
         }
     }
-
 }
 
 impl Light {
