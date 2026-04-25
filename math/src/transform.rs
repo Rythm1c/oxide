@@ -1,4 +1,4 @@
-use super::{mat4::*, quaternion::*, vec3::*};
+use super::{mat4x4::*, quaternion::*, vec3::*};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Transform {
@@ -30,7 +30,7 @@ impl Transform {
         }
     }
 
-    pub fn from_mat(mat: &Mat4) -> Self {
+    pub fn from_mat(mat: &Mat4x4) -> Self {
         let mut transform = Self::DEFAULT;
 
         let translation = Vec3 {
@@ -41,7 +41,7 @@ impl Transform {
 
         let orientation = mat.to_quat();
         let d = &mat.data;
-        let rot_scale_mat = Mat4 {
+        let rot_scale_mat = Mat4x4 {
             data: [
                 [d[0][0], d[0][1], d[0][2], 0.0],
                 [d[1][0], d[1][1], d[1][2], 0.0],
@@ -65,7 +65,7 @@ impl Transform {
         transform
     }
 
-    pub fn to_mat(&self) -> Mat4 {
+    pub fn to_mat(&self) -> Mat4x4 {
         let mut x = self.orientation * vec3(1.0, 0.0, 0.0);
         let mut y = self.orientation * vec3(0.0, 1.0, 0.0);
         let mut z = self.orientation * vec3(0.0, 0.0, 1.0);
@@ -76,7 +76,7 @@ impl Transform {
 
         let p = self.translation;
 
-        Mat4 {
+        Mat4x4 {
             data: [
                 [x.x, y.x, z.x, p.x],
                 [x.y, y.y, z.y, p.y],

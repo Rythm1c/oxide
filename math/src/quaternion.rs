@@ -4,7 +4,7 @@
 // "john vince - quaternions for for computer graphics" was a massive help along with
 // "gabor szauer - hands on c++ game animation programming packt", both great books.
 
-use super::{mat4::*, vec3::*};
+use super::{mat4x4::*, vec3::*};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Quat {
@@ -113,7 +113,7 @@ impl Quat {
 
     /// rotate around a specified axis
     /// creates a rotation matrix from a quaternion
-    pub fn to_mat(&self) -> Mat4 {
+    pub fn to_mat(&self) -> Mat4x4 {
         let x2 = f32::powf(self.x, 2.0);
         let y2 = f32::powf(self.y, 2.0);
         let z2 = f32::powf(self.z, 2.0);
@@ -130,11 +130,11 @@ impl Quat {
         let zy = 2.0 * (self.y * self.z + self.s * self.x);
         let zz = 1.0 - 2.0 * (x2 + y2);
 
-        Mat4 {
+        Mat4x4 {
             data: [
-                [xx, xy, xz, 0.0],
-                [yx, yy, yz, 0.0],
-                [zx, zy, zz, 0.0],
+                [ xx,  xy,  xz, 0.0],
+                [ yx,  yy,  yz, 0.0],
+                [ zx,  zy,  zz, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
         }

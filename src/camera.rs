@@ -1,5 +1,5 @@
 use math::{
-    mat4::{self, Mat4},
+    mat4x4::{self, Mat4x4},
     quaternion::Quat,
     vec3::{Vec3, cross, vec3},
 };
@@ -134,20 +134,20 @@ impl Camera {
         self.pos
     }
 
-    pub fn view_matrix(&self) -> Mat4 {
-        mat4::look_at(self.pos, self.pos + self.get_forward(), Vec3::Y)
+    pub fn view_matrix(&self) -> Mat4x4 {
+        mat4x4::look_at(self.pos, self.pos + self.get_forward(), Vec3::Y)
     }
 
-    pub fn projection_matrix(&self) -> Mat4 {
-        let mut projection = mat4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
+    pub fn projection_matrix(&self) -> Mat4x4 {
+        let mut projection = mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
         
         projection.data[1][1] *= -1.0; // Flip Y for Vulkan's coordinate system
 
         projection
     }
 
-    pub fn view_projection_matrix(&self) -> Mat4 {
-        mat4::transpose(&(self.projection_matrix() * self.view_matrix()))
+    pub fn view_projection_matrix(&self) -> Mat4x4 {
+        mat4x4::transpose(&(self.projection_matrix() * self.view_matrix()))
     }
 
     // ==================== Configuration ====================
@@ -168,8 +168,8 @@ impl Camera {
 
         CameraUbo {
             view_dir : [dir.x, dir.y, dir.z, 0.0],
-            view     : mat4::transpose(&self.view_matrix()).data,
-            proj     : mat4::transpose(&self.projection_matrix()).data,
+            view     : mat4x4::transpose(&self.view_matrix()).data,
+            proj     : mat4x4::transpose(&self.projection_matrix()).data,
         }
     }
 }
