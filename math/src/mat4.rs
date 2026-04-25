@@ -11,22 +11,10 @@ pub struct Mat4 {
 }
 
 pub fn mat4(
-    xx: f32,
-    xy: f32,
-    xz: f32,
-    xw: f32,
-    yx: f32,
-    yy: f32,
-    yz: f32,
-    yw: f32,
-    zx: f32,
-    zy: f32,
-    zz: f32,
-    zw: f32,
-    wx: f32,
-    wy: f32,
-    wz: f32,
-    ww: f32,
+    xx: f32, xy: f32, xz: f32, xw: f32,
+    yx: f32, yy: f32, yz: f32, yw: f32,
+    zx: f32, zy: f32, zz: f32, zw: f32,
+    wx: f32, wy: f32, wz: f32, ww: f32,
 ) -> Mat4 {
     Mat4 {
         data: [
@@ -56,8 +44,10 @@ impl Mat4 {
         let data = self.data.as_flattened();
 
         [
-            data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
-            data[9], data[10], data[11], data[12], data[13], data[14], data[15],
+            data[0],  data[1],  data[2],  data[3], 
+            data[4],  data[5],  data[6],  data[7], 
+            data[8],  data[9],  data[10], data[11],
+            data[12], data[13], data[14], data[15],
         ]
     }
     /// changes signs past 180 degrees  
@@ -338,9 +328,9 @@ pub fn rotation_y(angle: f32) -> Mat4 {
 
     return Mat4 {
         data: [
-            [xx, 0.0, xz, 0.0],
+            [ xx, 0.0,  xz, 0.0],
             [0.0, 1.0, 0.0, 0.0],
-            [zx, 0.0, zz, 0.0],
+            [ zx, 0.0,  zz, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ],
     };
@@ -380,10 +370,10 @@ pub fn look_at(eye: Vec3, front: Vec3, up: Vec3) -> Mat4 {
 
     Mat4 {
         data: [
-            [cr.x, cr.y, cr.z, xw],
-            [cu.x, cu.y, cu.z, yw],
-            [cd.x, cd.y, cd.z, zw],
-            [0.0, 0.0, 0.0, 1.0],
+            [cr.x, cr.y, cr.z,  xw],
+            [cu.x, cu.y, cu.z,  yw],
+            [cd.x, cd.y, cd.z,  zw],
+            [ 0.0,  0.0,  0.0, 1.0],
         ],
     }
 }
@@ -420,9 +410,9 @@ pub fn orthogonal(r: f32, l: f32, t: f32, b: f32, n: f32, f: f32) -> Mat4 {
     let zw = -(n + f) / (f - n);
     Mat4 {
         data: [
-            [xx, 0.0, 0.0, xw],
-            [0.0, yy, 0.0, yw],
-            [0.0, 0.0, zz, zw],
+            [ xx, 0.0, 0.0,  xw],
+            [0.0,  yy, 0.0,  yw],
+            [0.0, 0.0,  zz,  zw],
             [0.0, 0.0, 0.0, 1.0],
         ],
     }
@@ -430,8 +420,8 @@ pub fn orthogonal(r: f32, l: f32, t: f32, b: f32, n: f32, f: f32) -> Mat4 {
 
 pub fn perspective(fov: f32, aspect_ratio: f32, near: f32, far: f32) -> Mat4 {
     let tangent = f32::tan(radians(fov / 2.0));
-    let top = near * tangent;
-    let right = top * aspect_ratio;
+    let top     = near * tangent;
+    let right   = top * aspect_ratio;
 
     frustrum(-right, right, top, -top, near, far)
 }
