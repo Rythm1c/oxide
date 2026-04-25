@@ -30,11 +30,22 @@ fn main() -> anyhow::Result<()> {
     scene.add_object(
         object::Object::new(geometry::Shape::UVSphere {
             radius: 0.5,
-            segments: 32,
-            rings: 16,
+            segments: 40,
+            rings: 40,
             color: None,
         }),
         Vec3::new(3.0, 0.0, 0.0),
+        Vec3::new(1.0, 1.0, 1.0),
+        Quat::ZERO,
+    );
+
+    scene.add_object(
+        object::Object::new(geometry::Shape::CubeSphere {
+            radius: 2.0,
+            subdivisions: 50,
+            color: Some([0.0, 1.0, 0.0]),
+        }),
+        Vec3::new(-3.0, 0.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
         Quat::ZERO,
     );

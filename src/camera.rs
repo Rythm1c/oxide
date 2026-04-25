@@ -25,7 +25,7 @@ pub struct Camera {
     orientation: Quat,
     pitch      : f32,
     yaw        : f32,
-    up         : Vec3,
+    //up         : Vec3,
 
     // Projection
     aspect_ratio: f32,
@@ -47,7 +47,7 @@ impl Camera {
             orientation: Quat::ZERO,
             pitch      : 0.0,
             yaw        : 0.0,
-            up         : -Vec3::Y,
+            //up         : -Vec3::Y,
 
             aspect_ratio,
 
@@ -120,13 +120,13 @@ impl Camera {
     }
 
     fn strafe(&mut self, delta: f32) {
-        let right = cross(&self.get_forward(), &self.up).unit();
-        self.up = cross(&right, &self.get_forward()).unit();
+        let right = cross(&self.get_forward(), &-Vec3::Y).unit();
+        //self.up = cross(&right, &self.get_forward()).unit();
         self.pos = self.pos + right * self.speed * delta;
     }
 
     fn move_up(&mut self, delta: f32) {
-        self.pos = self.pos + self.up * self.speed * delta;
+        self.pos.y +=  self.speed * delta;
     }
 
     // ==================== Getters ====================
@@ -139,7 +139,7 @@ impl Camera {
     }
 
     pub fn view_matrix(&self) -> Mat4x4 {
-        let view = mat4x4::look_at(self.pos, self.pos + self.get_forward(), self.up);
+        let view = mat4x4::look_at(self.pos, self.pos + self.get_forward(), -Vec3::Y);
 
         mat4x4::transpose(&view) // Transpose for column-major order
     }
