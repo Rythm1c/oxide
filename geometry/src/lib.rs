@@ -11,18 +11,20 @@ pub enum Shape {
         size : f32,
         color: Option<[f32; 3]>,
     },
+    
     UVSphere {
         radius  : f32,
         segments: u32,
         rings   : u32,
         color   : Option<[f32; 3]>,
     },
+
     CubeSphere { 
         radius: f32, 
         subdivisions: u32, 
         color: Option<[f32; 3]> 
     }
-    /*  Triangle { color: Option<[f32; 3]> },
+    /* 
 
     Torus { major_radius: f32, minor_radius: f32, major_segments: u32, minor_segments: u32, color: Option<[f32; 3]> },
     , */
@@ -40,6 +42,7 @@ impl Shape {
                 rings,
                 color,
             } => uv_sphere::generate_uv_sphere(*radius, *segments, *rings, *color), 
+
             Shape::CubeSphere { 
                 radius, 
                 subdivisions, 

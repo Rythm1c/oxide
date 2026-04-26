@@ -12,6 +12,26 @@ layout(set = 0, binding = 1) uniform LightUBO {
     vec4 light_color;
 } lightUBO;
 
+layout(set = 1, binding = 0) uniform MaterialUBO {
+    vec4  albedo;      // xyz = base colour, w = unused
+    float roughness;   // 0 = mirror, 1 = completely diffuse
+    float metallic;    // 0 = dielectric (plastic/stone), 1 = metal
+    float ao;          // ambient occlusion (1.0 = no occlusion)
+
+    float _pad0;       // padding
+    
+    /* checker board pattern configaration*/
+    float useChecker;  // 0.0=solid, 1.0=checker
+    float divisions;   // number of checher boxes per face
+    float factor;      // darkness of the checker boxes
+
+} material;
+
+// checker board pattern generator  
+float checker() {
+
+}
+
 void main() {
 
     //directional lighting
@@ -20,10 +40,10 @@ void main() {
     vec3 ambient = vec3(0.01, 0.01, 0.01) * lightUBO.light_color.xyz;
 
     //diffuse
-    vec3 normal  = normalize(o_normal);
+    vec3 normal   = normalize(o_normal);
     vec3 lightDir = normalize(lightUBO.light_dir.xyz);
-    float diff   = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = lightUBO.light_color.xyz * diff;
+    float diff    = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse  = lightUBO.light_color.xyz * diff;
 
     //specular
     vec3 viewDir    = normalize(-view_dir);  // Negate because view_dir points away from camera
