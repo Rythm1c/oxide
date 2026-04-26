@@ -24,6 +24,6 @@ sample render on windows
 ## Features inlcude:
 - FPS style camera
 - directional lighting
-- PBR rendering(coming very soon..)
+- Physical based rendering
 - physics(coming soon..)
 - shadow-map(coming soon..)

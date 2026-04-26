@@ -103,7 +103,16 @@ impl Scene {
 
     /// Returns light UBO data.
     pub fn light_ubo(&self) -> LightUbo {
-        self.light.get_ubo()
+        let cpos = self.camera().position().to_array();
+        let dir = self.light.direction;
+        let col = self.light.color;
+        let amb = self.light.ambient;
+        LightUbo {
+            camera_pos : [cpos[0], cpos[1], cpos[2], 0.0],
+            ambient    : [amb[0], amb[1], amb[2], 0.0],
+            light_dir  : [dir[0], dir[1], dir[2], 0.0],
+            light_color: [col[0], col[1], col[2], 2.0],
+        }
     }
 
     /// Uploads all scene objects to GPU in batch.
@@ -126,25 +135,16 @@ impl Scene {
 
 pub struct Light {
     pub color    : [f32; 3],
+    pub ambient  : [f32; 3],
     pub direction: [f32; 3],
 }
 
 impl Default for Light {
     fn default() -> Self {
         Light {
-            color    : [1.0, 1.0, 1.0],
-            direction: [0.1, -1.0, -0.1],
-        }
-    }
-}
-
-impl Light {
-    pub fn get_ubo(&self) -> LightUbo {
-        let dir = self.direction;
-        let col = self.color;
-        LightUbo {
-            light_dir  : [dir[0], dir[1], dir[2], 0.0],
-            light_color: [col[0], col[1], col[2], 1.0],
+            ambient  : [0.1; 3],
+            color    : [1.0; 3],
+            direction: [0.6, 1.0, -0.4],
         }
     }
 }

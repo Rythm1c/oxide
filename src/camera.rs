@@ -176,7 +176,6 @@ impl Camera {
         CameraUbo {
             view     : self.view_matrix().data,
             proj     : self.projection_matrix().data,
-            view_dir : [dir.x, dir.y, dir.z, 0.0],
         }
     }
 }

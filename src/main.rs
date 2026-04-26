@@ -22,10 +22,10 @@ fn main() -> anyhow::Result<()> {
     scene.add_object(
         object::Object::new(
             geometry::Shape::Cube {
-                size: 1.0,
+                size: 2.0,
                 color: None,
             },
-            Material::default(),
+            Material::metal(true, 8.0, 0.4),
         ),
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
@@ -50,11 +50,11 @@ fn main() -> anyhow::Result<()> {
     scene.add_object(
         object::Object::new(
             geometry::Shape::CubeSphere {
-                radius: 2.0,
+                radius: 0.8,
                 subdivisions: 50,
                 color: None,
             },
-            Material::rubber(true, 8.0, 0.0),
+            Material::rubber(false, 6.0, 0.4),
         ),
         Vec3::new(-3.0, 0.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),

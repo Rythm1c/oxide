@@ -5,30 +5,27 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 uv;
 layout(location = 3) in vec3 color;
 
-
 layout(location = 0) out vec3 o_normal;
 layout(location = 1) out vec2 o_uv;
 layout(location = 2) out vec3 o_color;
-layout(location = 3) out vec3 view_dir;
+layout(location = 3) out vec3 fragWorldPos;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 projection;
-    vec4 view_dir;
 } camera;
 
 layout(push_constant) uniform PushConstants {
-    mat4  model;
+    mat4 model;
 } pc;
 
 void main() {
-    o_normal = normalize(mat3(transpose(inverse(pc.model))) * normal);
-    o_uv     = uv;
-    o_color  = color;
-    view_dir = camera.view_dir.xyz;
-
     vec4 worldPos = pc.model * vec4(pos, 1.0);
-    vec4 viewPos  = camera.view * worldPos;
-    gl_Position   = camera.projection * viewPos;
-    //gl_Position = pc.model * vec4(pos, 1.0);
+
+    o_normal     = normalize(mat3(transpose(inverse(pc.model))) * normal);
+    o_uv         = uv;
+    o_color      = color;
+    fragWorldPos = worldPos.xyz;  
+
+    gl_Position = camera.projection * camera.view * worldPos;
 }
