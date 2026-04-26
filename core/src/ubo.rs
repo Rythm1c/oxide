@@ -1,5 +1,17 @@
 #[repr(C)]
 #[derive(Copy, Clone)]
+pub struct MaterialUbo{
+
+}
+
+impl Default for MaterialUbo {
+    fn default() -> Self {
+        Self {  }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
 pub struct CameraUbo {
     pub view    : [[f32; 4]; 4],
     pub proj    : [[f32; 4]; 4],

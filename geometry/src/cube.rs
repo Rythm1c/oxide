@@ -7,12 +7,12 @@ pub fn generate_cube(size: f32, color: Option<[f32; 3]>) -> (Vec<Vertex>, Vec<u3
     // Indices define 2 triangles per face (6 faces, 12 triangles, 36 indices).
 
     let face_colors = [
-        [0.0, 0.0, 1.0], // +X face - blue
-        [0.0, 0.0, 1.0], // -X face - blue
-        [1.0, 1.0, 0.0], // +Y face - yellow
-        [1.0, 1.0, 0.0], // -Y face - yellow
-        [1.0, 0.0, 0.0], // +Z face - red
-        [1.0, 0.0, 0.0], // -Z face - red
+        [0.1, 0.2, 0.8], // +X face - blue
+        [0.1, 0.2, 0.8], // -X face - blue
+        [8.0, 0.9, 0.05], // +Y face - yellow
+        [8.0, 0.9, 0.05], // -Y face - yellow
+        [0.9, 0.15, 0.05], // +Z face - red
+        [0.9, 0.15, 0.05], // -Z face - red
     ];
 
     let positions = [

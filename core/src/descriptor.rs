@@ -1,20 +1,22 @@
 use ash::vk;
 use std::sync::Arc;
 
+use crate::ubo::MaterialUbo;
+
 use super::buffer::{Buffer, BufferUsage};
 use super::device::DeviceContext;
 use super::ubo::{CameraUbo, LightUbo};
 
 // global set for the camera and light UBOs, which are shared across all draw calls
 pub struct GlobalDescriptorSet {
-    ctx           : Arc<DeviceContext>,
+    ctx: Arc<DeviceContext>,
 
-    layout        : vk::DescriptorSetLayout,
-    pool          : vk::DescriptorPool,
-    sets          : Vec<vk::DescriptorSet>, // one per frame in flight
+    layout: vk::DescriptorSetLayout,
+    pool: vk::DescriptorPool,
+    sets: Vec<vk::DescriptorSet>, // one per frame in flight
 
     camera_buffers: Vec<Buffer>,
-    light_buffers : Vec<Buffer>,
+    light_buffers: Vec<Buffer>,
 }
 
 impl GlobalDescriptorSet {
@@ -70,7 +72,7 @@ impl GlobalDescriptorSet {
         let light_size = std::mem::size_of::<LightUbo>() as vk::DeviceSize;
 
         let mut camera_buffers = Vec::with_capacity(frames_in_flight);
-        let mut light_buffers  = Vec::with_capacity(frames_in_flight);
+        let mut light_buffers = Vec::with_capacity(frames_in_flight);
 
         for _ in 0..frames_in_flight {
             camera_buffers.push(Buffer::new(
@@ -142,7 +144,12 @@ impl GlobalDescriptorSet {
         self.sets[frame]
     }
 
-    pub fn flush(&mut self, frame: usize, camera: &CameraUbo, light: &LightUbo) -> anyhow::Result<()> {
+    pub fn flush(
+        &mut self,
+        frame: usize,
+        camera: &CameraUbo,
+        light: &LightUbo,
+    ) -> anyhow::Result<()> {
         self.camera_buffers[frame].write(std::slice::from_ref(camera))?;
         self.light_buffers[frame].write(std::slice::from_ref(light))?;
         Ok(())
@@ -151,14 +158,106 @@ impl GlobalDescriptorSet {
 
 impl Drop for GlobalDescriptorSet {
     fn drop(&mut self) {
-        // Drop buffers FIRST - they hold GPU memory allocations that must be freed
-        // while the allocator is still alive and valid
         self.camera_buffers.clear();
         self.light_buffers.clear();
 
         unsafe {
             self.ctx.device.destroy_descriptor_pool(self.pool, None);
-            self.ctx.device.destroy_descriptor_set_layout(self.layout, None);
+            self.ctx
+                .device
+                .destroy_descriptor_set_layout(self.layout, None);
         }
+    }
+}
+
+pub struct MaterialDesriptorSet {
+    ctx: Arc<DeviceContext>,
+
+    layout: vk::DescriptorSetLayout,
+    pool: vk::DescriptorPool,
+    set: vk::DescriptorSet, //updated once so no need for per frame set
+
+    material_buffer: Buffer,
+}
+
+impl MaterialDesriptorSet {
+    pub fn new(ctx: Arc<DeviceContext>) -> anyhow::Result<Self> {
+        let device = &ctx.device;
+
+        let layout = Self::layout(device)?;
+
+        let pool_sizes = [vk::DescriptorPoolSize::default()
+            .ty(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count(1)];
+
+        let pool = unsafe {
+            device.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::default()
+                    .max_sets(1)
+                    .pool_sizes(&pool_sizes),
+                None,
+            )?
+        };
+
+        let layouts: Vec<vk::DescriptorSetLayout> = vec![layout];
+        let sets = unsafe {
+            device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::default()
+                    .descriptor_pool(pool)
+                    .set_layouts(&layouts),
+            )?
+        };
+
+        let material_size = std::mem::size_of::<MaterialUbo>() as vk::DeviceSize;
+        let material_buffer = Buffer::new(Arc::clone(&ctx), material_size, BufferUsage::UNIFORM)?;
+
+        //let mut descriptor_writes = Vec::with_capacity(1);
+
+        let material_buffer_infos = [vk::DescriptorBufferInfo::default()
+            .buffer(material_buffer.raw)
+            .offset(0)
+            .range(material_size)];
+
+        let descriptor_write = vk::WriteDescriptorSet::default()
+            .dst_set(sets[0])
+            .dst_binding(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(&material_buffer_infos);
+
+        unsafe { device.update_descriptor_sets(&[descriptor_write], &[]) };
+
+        Ok(Self {
+            ctx,
+            layout,
+            pool,
+            set: sets[0],
+            material_buffer,
+        })
+    }
+
+    pub fn layout(device: &ash::Device) -> anyhow::Result<vk::DescriptorSetLayout> {
+        let bindings = [vk::DescriptorSetLayoutBinding::default()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::VERTEX)];
+
+        let layout = unsafe {
+            device.create_descriptor_set_layout(
+                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
+                None,
+            )?
+        };
+
+        Ok(layout)
+    }
+
+    pub fn set(&self) -> vk::DescriptorSet {
+        self.set
+    }
+
+    pub fn flush(&mut self, material: &MaterialUbo) -> anyhow::Result<()> {
+        self.material_buffer.write(std::slice::from_ref(material))?;
+        Ok(())
     }
 }

@@ -28,7 +28,7 @@ void main() {
     //specular
     vec3 viewDir    = normalize(-view_dir);  // Negate because view_dir points away from camera
     vec3 reflectDir = reflect(-lightDir, normal);
-    float spec      = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+    float spec      = pow(max(dot(viewDir, reflectDir), 0.0), 8.0);
     vec3 specular   = lightUBO.light_color.xyz * spec;
 
     //final color
