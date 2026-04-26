@@ -13,7 +13,6 @@ layout(set = 0, binding = 1) uniform LightUBO {
 } lightUBO;
 
 layout(set = 1, binding = 0) uniform MaterialUBO {
-    vec4  albedo;      // xyz = base colour, w = unused
     float roughness;   // 0 = mirror, 1 = completely diffuse
     float metallic;    // 0 = dielectric (plastic/stone), 1 = metal
     float ao;          // ambient occlusion (1.0 = no occlusion)
@@ -25,11 +24,13 @@ layout(set = 1, binding = 0) uniform MaterialUBO {
     float divisions;   // number of checher boxes per face
     float factor;      // darkness of the checker boxes
 
+    float _pad1;   
+
 } material;
 
 // checker board pattern generator  
 float checker() {
-
+    return 0.0;
 }
 
 void main() {

@@ -258,7 +258,7 @@ impl MaterialAllocator {
         self.allocated += 1;
 
         Ok(MaterialDescriptorSet {
-            ctx: Arc::clone(&self.ctx),
+            //ctx: Arc::clone(&self.ctx),
             set: sets[0],
             buffer,
         })
@@ -287,7 +287,7 @@ impl Drop for MaterialAllocator {
 }
 
 pub struct MaterialDescriptorSet {
-    ctx    : Arc<DeviceContext>,
+    //ctx    : Arc<DeviceContext>,
     pub set: vk::DescriptorSet,
     buffer : Buffer,
 }

@@ -13,7 +13,6 @@ use math::transform::Transform;
 use std::sync::Arc;
 
 /// A renderable object combining geometry, transform, and GPU buffers.
-#[derive(Clone)]
 pub struct Object {
     geometry     : Geometry,
     transform    : Transform,
@@ -21,23 +20,23 @@ pub struct Object {
     // gpu stuff
     vertex_buffer: Option<Arc<Buffer>>,
     index_buffer : Option<Arc<Buffer>>,
-    gpu_material : Option<MaterialDescriptorSet>
+    gpu_material : Option<Arc<MaterialDescriptorSet>>
 
 }
 
 impl Object {
     /// Creates a new Object from a Shape without GPU buffers.
     /// Call `upload_to_gpu()` to transfer data to the GPU.
-    pub fn new(shape: Shape, m: Material) -> anyhow::Result<Self> {
-        Ok(
+    pub fn new(shape: Shape, mat: Material) -> Self {
+        
         Self {
             geometry     : Geometry::new(shape),
             transform    : Transform::default(),
-            material     : m,
+            material     : mat,
             vertex_buffer: None,
             index_buffer : None,
             gpu_material : None
-        })
+        }
     }
 
     pub fn upload_geometry_to_gpu(&mut self, ctx: Arc<DeviceContext>) -> anyhow::Result<()> {
@@ -60,9 +59,11 @@ impl Object {
 
     pub fn upload_material_to_gpu(
         &mut self, 
-        material_allocator: &Arc<MaterialAllocator>) 
+        material_allocator: &mut MaterialAllocator) 
         -> anyhow::Result<()> {
-        self.gpu_material = Some(material_allocator.allocate(&self.material.get_ubo())?);
+        self.gpu_material = Some(Arc::new(
+            material_allocator
+            .allocate(&self.material.get_ubo())?));
         Ok(())
     }
 
@@ -91,7 +92,13 @@ impl Object {
         let vertex_buffer = self
             .vertex_buffer
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Object not uploaded to GPU. Call upload_to_gpu() first"))?;
+            .ok_or_else(|| anyhow::anyhow!("Object not uploaded to GPU. Call upload_geometry_to_gpu() first"))?;
+
+
+        let gpu_material = self
+            .gpu_material
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("material not uploaded to GPU. Call upload_material_to_gpu() first"))?;
 
         let model = mat4x4::transpose(&self.transform.to_mat()).data;
 
@@ -101,11 +108,12 @@ impl Object {
             vertex_count  : self.geometry.vertex_count() as u32,
             index_count   : self.geometry.index_count() as u32,
             push_constants: PushConstants { model },
+            material_desc : Arc::clone(gpu_material)
         })
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct Material {
     pub metallic   : f32,
     pub roughness  : f32,
@@ -129,7 +137,7 @@ impl Default for Material {
 
 impl Material {
 
-    pub fn polished() -> Self{
+    pub fn polished(checkered: bool,divisions: f32, factor: f32) -> Self{
         let mut material = Material::default();
         material.use_checker = checkered;
         material.divisions   = divisions;
@@ -171,7 +179,7 @@ impl Material {
         material.divisions   = divisions;
         material.factor      = factor;
 
-        material .roughness  = 0.85;
+        material.roughness   = 0.85;
         material.metallic    = 0.0;
 
         material
@@ -185,7 +193,7 @@ impl Material {
 
             _pad0      : 0.0,
 
-            use_checker: if(self.use_checker) { 1.0 } else { 0.0 },
+            use_checker: if self.use_checker { 1.0 } else { 0.0 },
             divisions  : self.divisions,
             factor     : self.factor,
 

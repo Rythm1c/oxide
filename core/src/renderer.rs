@@ -181,10 +181,19 @@ impl Renderer {
                         obj.push_constants.as_bytes(),
                     );
 
+                    device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline.layout,
+                    1,
+                    &[obj.material_desc.set],
+                    &[],
+                );
+
                     device.cmd_bind_vertex_buffers(cmd, 0, &[obj.vertex_buffer.raw], &[0]);
 
-                    if let Some(ib) = &obj.index_buffer {
-                        device.cmd_bind_index_buffer(cmd, ib.raw, 0, vk::IndexType::UINT32);
+                    if let Some(idxbuf) = &obj.index_buffer {
+                        device.cmd_bind_index_buffer(cmd, idxbuf.raw, 0, vk::IndexType::UINT32);
                         device.cmd_draw_indexed(cmd, obj.index_count, 1, 0, 0, 0);
                     } else {
                         device.cmd_draw(cmd, obj.vertex_count, 1, 0, 0);

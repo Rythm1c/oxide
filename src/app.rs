@@ -2,7 +2,10 @@ use super::scene::Scene;
 
 use engine_core::{
     context::VkContext, 
-    descriptor::GlobalDescriptorSet, 
+    descriptor::{
+        GlobalDescriptorSet,
+        MaterialAllocator
+        }, 
     pipeline::{
         GraphicsPipeline, 
         GraphicsPipelineConfig, 
@@ -11,7 +14,6 @@ use engine_core::{
     renderer::Renderer
 };
 
-use std::error::Error;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -22,14 +24,15 @@ use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
 struct VulkanCore {
-    renderer: Renderer,
-    pipeline: GraphicsPipeline,
-    globals : GlobalDescriptorSet,
-    context : Arc<VkContext>,
+    renderer          : Renderer,
+    pipeline          : GraphicsPipeline,
+    globals           : GlobalDescriptorSet,
+    material_allocator: MaterialAllocator,
+    context           : Arc<VkContext>,
 }
 
 impl VulkanCore {
-    pub fn new(app_name: &str, window: &Window) -> Result<Self, Box<dyn Error>> {
+    pub fn new(app_name: &str, window: &Window) -> anyhow::Result<Self> {
         let context = Arc::new(VkContext::new(
             app_name,
             window,
@@ -41,21 +44,28 @@ impl VulkanCore {
             Arc::clone(&context.device_ctx),
             Renderer::MAX_FRAMES_IN_FLIGHT,
         )?;
+
+        //100 objects for now
+        let material_allocator = 
+            MaterialAllocator::new(Arc::clone(&context.device_ctx), 100)?;
         
         let cfg = GraphicsPipelineConfig::default()
             .vertex_shader("shaders/vert.spv")
             .fragment_shader("shaders/frag.spv")
             .cull_mode(ash::vk::CullModeFlags::BACK)
             .polygon_mode(ash::vk::PolygonMode::FILL)
-            .descriptor_layouts(vec![globals.layout()])
+            .descriptor_layouts(vec![globals.layout(), material_allocator.layout()])
             .push_constant_ranges(vec![PushConstants::push_range()]);
 
         let pipeline = GraphicsPipeline::create(&cfg, Arc::clone(&context))?;
 
         let renderer = Renderer::new(Arc::clone(&context));
 
+        
+
         Ok(VulkanCore {
             globals,
+            material_allocator,
             context,
             pipeline,
             renderer,
@@ -116,10 +126,10 @@ impl ApplicationHandler for App {
             Some(VulkanCore::new("Vulkan App", self.window.as_ref().unwrap()).unwrap());
 
         // Upload all scene objects to GPU
-        if let Some(core) = &self.vulkan_core {
+        if let Some(core) = &mut self.vulkan_core {
             let device_ctx = Arc::clone(&core.context.device_ctx);
             if let Some(scene) = &self.scene {
-                if let Err(e) = scene.upload_all_objects(device_ctx) {
+                if let Err(e) = scene.upload_all_objects(device_ctx, &mut core.material_allocator) {
                     eprintln!("Failed to upload scene objects: {}", e);
                 }
             }

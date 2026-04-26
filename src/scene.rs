@@ -1,12 +1,16 @@
 use crate::object::Object;
+use crate::camera::Camera;
 
-use super::camera::Camera;
-
+use engine_core::descriptor::MaterialAllocator;
 use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
+use engine_core::device::DeviceContext;
+
 use math::quaternion::Quat;
 use math::vec3::Vec3;
+
 use std::sync::Mutex;
+use std::sync::Arc;
 
 pub struct Scene {
     pub light: Light,
@@ -26,9 +30,9 @@ impl Scene {
 
     /// Adds an object to the scene (thread-safe).
     pub fn add_object(&self, object: Object, pos: Vec3, scale: Vec3, rot: Quat) {
-        let mut obj = object.clone();
+        let mut obj = object;
         obj.transform_mut().translation = pos;
-        obj.transform_mut().scaling = scale;
+        obj.transform_mut().scaling     = scale;
         obj.transform_mut().orientation = rot;
         self.objects.lock().unwrap().push(obj);
     }
@@ -104,11 +108,16 @@ impl Scene {
 
     /// Uploads all scene objects to GPU in batch.
     /// Call this once after adding all objects, typically right before rendering.
-    pub fn upload_all_objects(&self, device_ctx: std::sync::Arc<engine_core::device::DeviceContext>) -> anyhow::Result<()> {
+    pub fn upload_all_objects(
+        &self, 
+        device_ctx: Arc<DeviceContext>, 
+        material_allocator: &mut MaterialAllocator) 
+        -> anyhow::Result<()> {
         let mut objects = self.objects.lock().unwrap();
         for obj in objects.iter_mut() {
             if !obj.is_uploaded() {
-                obj.upload_to_gpu(std::sync::Arc::clone(&device_ctx))?;
+                obj.upload_geometry_to_gpu(Arc::clone(&device_ctx))?;
+                obj.upload_material_to_gpu(material_allocator)?;
             }
         }
         Ok(())
