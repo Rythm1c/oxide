@@ -240,7 +240,7 @@ impl MaterialDesriptorSet {
             .binding(0)
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
             .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::VERTEX)];
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)];
 
         let layout = unsafe {
             device.create_descriptor_set_layout(
