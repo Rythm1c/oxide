@@ -9,14 +9,14 @@ use super::ubo::{CameraUbo, LightUbo};
 
 // global set for the camera and light UBOs, which are shared across all draw calls
 pub struct GlobalDescriptorSet {
-    ctx: Arc<DeviceContext>,
+    ctx           : Arc<DeviceContext>,
 
-    layout: vk::DescriptorSetLayout,
-    pool: vk::DescriptorPool,
-    sets: Vec<vk::DescriptorSet>, // one per frame in flight
+    layout        : vk::DescriptorSetLayout,
+    pool          : vk::DescriptorPool,
+    sets          : Vec<vk::DescriptorSet>, // one per frame in flight
 
     camera_buffers: Vec<Buffer>,
-    light_buffers: Vec<Buffer>,
+    light_buffers : Vec<Buffer>,
 }
 
 impl GlobalDescriptorSet {
@@ -146,9 +146,9 @@ impl GlobalDescriptorSet {
 
     pub fn flush(
         &mut self,
-        frame: usize,
+        frame : usize,
         camera: &CameraUbo,
-        light: &LightUbo,
+        light : &LightUbo,
     ) -> anyhow::Result<()> {
         self.camera_buffers[frame].write(std::slice::from_ref(camera))?;
         self.light_buffers[frame].write(std::slice::from_ref(light))?;
@@ -171,10 +171,10 @@ impl Drop for GlobalDescriptorSet {
 }
 
 pub struct MaterialAllocator {
-    ctx: Arc<DeviceContext>,
-    layout: vk::DescriptorSetLayout,
-    pool: vk::DescriptorPool,
-    capacity: u32,
+    ctx      : Arc<DeviceContext>,
+    layout   : vk::DescriptorSetLayout,
+    pool     : vk::DescriptorPool,
+    capacity : u32,
     allocated: u32,
 }
 
@@ -287,9 +287,9 @@ impl Drop for MaterialAllocator {
 }
 
 pub struct MaterialDescriptorSet {
-    ctx: Arc<DeviceContext>,
+    ctx    : Arc<DeviceContext>,
     pub set: vk::DescriptorSet,
-    buffer: Buffer,
+    buffer : Buffer,
 }
 
 impl MaterialDescriptorSet {
