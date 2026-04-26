@@ -170,72 +170,18 @@ impl Drop for GlobalDescriptorSet {
     }
 }
 
-pub struct MaterialDesriptorSet {
+pub struct MaterialAllocator {
     ctx: Arc<DeviceContext>,
-
     layout: vk::DescriptorSetLayout,
     pool: vk::DescriptorPool,
-    set: vk::DescriptorSet, //updated once so no need for per frame set
-
-    material_buffer: Buffer,
+    capacity: u32,
+    allocated: u32,
 }
 
-impl MaterialDesriptorSet {
-    pub fn new(ctx: Arc<DeviceContext>) -> anyhow::Result<Self> {
+impl MaterialAllocator {
+    pub fn new(ctx: Arc<DeviceContext>, capacity: u32) -> anyhow::Result<Self> {
         let device = &ctx.device;
 
-        let layout = Self::layout(device)?;
-
-        let pool_sizes = [vk::DescriptorPoolSize::default()
-            .ty(vk::DescriptorType::UNIFORM_BUFFER)
-            .descriptor_count(1)];
-
-        let pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&pool_sizes),
-                None,
-            )?
-        };
-
-        let layouts: Vec<vk::DescriptorSetLayout> = vec![layout];
-        let sets = unsafe {
-            device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&layouts),
-            )?
-        };
-
-        let material_size = std::mem::size_of::<MaterialUbo>() as vk::DeviceSize;
-        let material_buffer = Buffer::new(Arc::clone(&ctx), material_size, BufferUsage::UNIFORM)?;
-
-        //let mut descriptor_writes = Vec::with_capacity(1);
-
-        let material_buffer_infos = [vk::DescriptorBufferInfo::default()
-            .buffer(material_buffer.raw)
-            .offset(0)
-            .range(material_size)];
-
-        let descriptor_write = vk::WriteDescriptorSet::default()
-            .dst_set(sets[0])
-            .dst_binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-            .buffer_info(&material_buffer_infos);
-
-        unsafe { device.update_descriptor_sets(&[descriptor_write], &[]) };
-
-        Ok(Self {
-            ctx,
-            layout,
-            pool,
-            set: sets[0],
-            material_buffer,
-        })
-    }
-
-    pub fn layout(device: &ash::Device) -> anyhow::Result<vk::DescriptorSetLayout> {
         let bindings = [vk::DescriptorSetLayoutBinding::default()
             .binding(0)
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
@@ -249,15 +195,111 @@ impl MaterialDesriptorSet {
             )?
         };
 
-        Ok(layout)
+        // One UBO descriptor per set, `capacity` sets total.
+        let pool_sizes = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptor_count: capacity,
+        }];
+
+        let pool = unsafe {
+            device.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::default()
+                    .max_sets(capacity)
+                    .pool_sizes(&pool_sizes),
+                None,
+            )?
+        };
+
+        Ok(Self {
+            ctx,
+            layout,
+            pool,
+            capacity,
+            allocated: 0,
+        })
     }
 
-    pub fn set(&self) -> vk::DescriptorSet {
-        self.set
+    pub fn allocate(&mut self, initial: &MaterialUbo) -> anyhow::Result<MaterialDescriptorSet> {
+        if self.allocated >= self.capacity {
+            anyhow::bail!(
+                "MaterialAllocator pool exhausted ({} / {}). \
+                Recreate with a larger capacity.",
+                self.allocated,
+                self.capacity
+            );
+        }
+
+        let set_layouts = [self.layout];
+        let sets = unsafe {
+            self.ctx.device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::default()
+                    .descriptor_pool(self.pool)
+                    .set_layouts(&set_layouts),
+            )?
+        };
+
+        let material_size = std::mem::size_of::<MaterialUbo>() as vk::DeviceSize;
+        let mut buffer = Buffer::new(Arc::clone(&self.ctx), material_size, BufferUsage::UNIFORM)?;
+        buffer.write(std::slice::from_ref(initial))?;
+
+        let buffer_info = [vk::DescriptorBufferInfo::default()
+            .buffer(buffer.raw)
+            .offset(0)
+            .range(material_size)];
+
+        let write = vk::WriteDescriptorSet::default()
+            .dst_set(sets[0])
+            .dst_binding(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(&buffer_info);
+
+        unsafe { self.ctx.device.update_descriptor_sets(&[write], &[]) };
+
+        self.allocated += 1;
+
+        Ok(MaterialDescriptorSet {
+            ctx: Arc::clone(&self.ctx),
+            set: sets[0],
+            buffer,
+        })
     }
 
+    pub fn layout(&self) -> vk::DescriptorSetLayout {
+        self.layout
+    }
+    pub fn allocated(&self) -> u32 {
+        self.allocated
+    }
+    pub fn capacity(&self) -> u32 {
+        self.capacity
+    }
+}
+
+impl Drop for MaterialAllocator {
+    fn drop(&mut self) {
+        unsafe {
+            self.ctx.device.destroy_descriptor_pool(self.pool, None);
+            self.ctx
+                .device
+                .destroy_descriptor_set_layout(self.layout, None);
+        }
+    }
+}
+
+pub struct MaterialDescriptorSet {
+    ctx: Arc<DeviceContext>,
+    pub set: vk::DescriptorSet,
+    buffer: Buffer,
+}
+
+impl MaterialDescriptorSet {
+    /// Update material properties (call when material changes, not every frame).
     pub fn flush(&mut self, material: &MaterialUbo) -> anyhow::Result<()> {
-        self.material_buffer.write(std::slice::from_ref(material))?;
-        Ok(())
+        self.buffer.write(std::slice::from_ref(material))
+    }
+}
+
+impl Drop for MaterialDescriptorSet {
+    fn drop(&mut self) {
     }
 }
