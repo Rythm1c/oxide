@@ -87,13 +87,13 @@ impl Scene {
 
     /// Updates the scene for the current frame.
     pub fn update(&self, delta_time: f32) {
-        self.camera.lock().unwrap().update(delta_time);
+        self.camera.lock().unwrap().process_keyboard(delta_time);
         // Placeholder for any per-frame scene updates (e.g. animations)
     }
 
     /// Rotates the camera based on mouse movement.
     pub fn rotate_camera(&self, yaw: f32, pitch: f32) {
-        self.camera.lock().unwrap().rotate(yaw, pitch);
+        self.camera.lock().unwrap().process_mouse(yaw, pitch);
     }
 
     /// Returns camera UBO data.

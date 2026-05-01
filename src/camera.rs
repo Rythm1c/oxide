@@ -1,6 +1,5 @@
 use math::{
-    mat4x4::{self, Mat4x4},
-    quaternion::Quat,
+    mat4x4,
     vec3::{Vec3, cross, vec3},
 };
 
@@ -22,10 +21,12 @@ enum CameraMotion {
 pub struct Camera {
     // Position and orientation
     pos        : Vec3,
-    orientation: Quat,
+    front      : Vec3,
+    right      : Vec3,
     pitch      : f32,
     yaw        : f32,
-    //up         : Vec3,
+    up         : Vec3,
+    //world_up   : Vec3,
 
     // Projection
     aspect_ratio: f32,
@@ -42,12 +43,14 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
-        Self {
-            pos        : vec3(0.0, 0.0, -10.0),
-            orientation: Quat::ZERO,
+        let mut camera = Self {
+            pos        : vec3(0.0, 1.0, 9.0),
+            front      : -Vec3::Z,
+            right      :  Vec3::X,
             pitch      : 0.0,
-            yaw        : 0.0,
-            //up         : -Vec3::Y,
+            yaw        : -90.0,
+            up         : Vec3::Y,
+            //world_up   : -Vec3::Y,
 
             aspect_ratio,
 
@@ -57,52 +60,44 @@ impl Camera {
             motion     : CameraMotion::Still,
             sensitivity: 0.075,
             speed      : 12.0,
-        }
+        };
+        camera.update_vectors();
+        camera
     }
 
     // ==================== Input Handling ====================
-    pub fn rotate(&mut self, dx: f32, dy: f32) {
+    pub fn process_mouse(&mut self, dx: f32, dy: f32) {
         self.yaw   += dx * self.sensitivity;
-        self.pitch += -dy * self.sensitivity;
+        self.pitch -= dy * self.sensitivity;
 
-        // Clamp pitch to avoid flipping
-        self.pitch = self.pitch.clamp(-89.0, 89.0);
+        self.pitch = f32::clamp(self.pitch, -89.0, 89.0);
 
-        // Update orientation quaternion from euler angles
-        let yaw_quat   = Quat::rotation_y(self.yaw);
-        let pitch_quat = Quat::rotation_x(self.pitch);
-        self.orientation = yaw_quat * pitch_quat;
+        self.update_vectors();
     }
 
     pub fn set_motion_still(&mut self) {
         self.motion = CameraMotion::Still;
     }
-
     pub fn set_motion_forwards(&mut self) {
         self.motion = CameraMotion::Forwards;
     }
-
     pub fn set_motion_backwards(&mut self) {
         self.motion = CameraMotion::BackWards;
     }
-
     pub fn set_motion_left(&mut self) {
         self.motion = CameraMotion::Left;
     }
-
     pub fn set_motion_right(&mut self) {
         self.motion = CameraMotion::Right;
     }
-
     pub fn set_motion_up(&mut self) {
         self.motion = CameraMotion::Up;
     }
-
     pub fn set_motion_down(&mut self) {
         self.motion = CameraMotion::Down;
     }
 
-    pub fn update(&mut self, delta: f32) {
+    pub fn process_keyboard(&mut self, delta: f32) {
         match self.motion {
             CameraMotion::Still     => {}
             CameraMotion::Forwards  => self.move_forward(delta),
@@ -112,46 +107,46 @@ impl Camera {
             CameraMotion::Up        => self.move_up(delta),
             CameraMotion::Down      => self.move_up(-delta),
         }
+
+        if self.motion != CameraMotion::Still{
+            self.update_vectors();
+        }
+    }
+
+    fn update_vectors(&mut self) {
+
+        let yaw   = self.yaw.to_radians();
+        let pitch = self.pitch.to_radians();
+
+        self.front.x = yaw.cos() * pitch.cos();
+        self.front.y = pitch.sin();
+        self.front.z = yaw.sin() * pitch.cos();
+
+        self.front = self.front.unit();
+
+        self.right = cross(self.front, Vec3::Y).unit();
+
+        self.up = cross(self.right, self.front).unit();
+
     }
 
     // ==================== Movement ====================
     fn move_forward(&mut self, delta: f32) {
-        self.pos = self.pos + self.get_forward() * self.speed * delta;
+        self.pos = self.pos + self.front * self.speed * delta;
     }
 
     fn strafe(&mut self, delta: f32) {
-        let right = cross(self.get_forward(), -Vec3::Y).unit();
-        //self.up = cross(&right, &self.get_forward()).unit();
-        self.pos = self.pos + right * self.speed * delta;
+        self.pos = self.pos + self.right * self.speed * delta;
     }
 
     fn move_up(&mut self, delta: f32) {
-        self.pos.y +=  self.speed * delta;
+        self.pos = self.pos + Vec3::Y * self.speed * delta;
     }
 
     // ==================== Getters ====================
-    pub fn get_forward(&self) -> Vec3 {
-        (self.orientation * Vec3::Z).unit()
-    }
-
     pub fn position(&self) -> Vec3 {
         self.pos
     }
-
-    pub fn view_matrix(&self) -> Mat4x4 {
-        let view = mat4x4::look_at(self.pos, self.pos + self.get_forward(), Vec3::Y);
-
-        mat4x4::transpose(&view) // Transpose for column-major order
-    }
-
-    pub fn projection_matrix(&self) -> Mat4x4 {
-        let mut projection = mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
-
-        projection.data[1][1] *= -1.0; // Flip Y for Vulkan's coordinate system
-
-        mat4x4::transpose(&projection) // Transpose for column-major order
-    }
-
 
     // ==================== Configuration ====================
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
@@ -167,9 +162,17 @@ impl Camera {
     }
 
     pub fn get_ubo(&self) -> CameraUbo {
+        let mut view = mat4x4::look_at(self.pos, self.pos + self.front, self.up);
+        view = mat4x4::transpose(&view); // Transpose for column-major order
+
+        let mut proj = mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
+        proj.data[1][1] *= -1.0; // Flip Y for Vulkan's coordinate system
+        proj = mat4x4::transpose(&proj); // Transpose for column-major order
+
+
         CameraUbo {
-            view     : self.view_matrix().data,
-            proj     : self.projection_matrix().data,
+            view : view.data,
+            proj : proj.data,
         }
     }
 }
