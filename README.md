@@ -6,6 +6,21 @@ I used rust to learn more about the language(i also like abit of pain).
 
 dependencies are in the .toml file.
 
+## Project set up
+if you dont have cargo installed in your system then go to https://rustup.rs and follow the guide to install rust on your system.
+
+once cargo is installed, clone the repo to a directory of your choice using the following command
+
+```
+git clone "https://github.com/Rythm1c/repo_name.git"
+```
+once the project is cloned open it in an editor of your choice and run using
+
+```
+cargo run
+```
+you should see a sample scene
+
 ## learning resources include:
 ### online 
 - https://vulkan-tutorial.com
