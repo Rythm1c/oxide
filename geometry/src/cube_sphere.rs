@@ -9,12 +9,12 @@ pub fn generate_cube_sphere(
     let mut indices = Vec::new();
 
     let face_colors = [
-        [0.1, 0.2, 0.8], // +X face - blue
-        [0.1, 0.2, 0.8], // -X face - blue
-        [8.0, 0.9, 0.05], // +Y face - yellow
-        [8.0, 0.9, 0.05], // -Y face - yellow
-        [0.9, 0.15, 0.05], // +Z face - red
-        [0.9, 0.15, 0.05], // -Z face - red
+        [0.1, 0.2, 0.9], // +X face - blue
+        [0.1, 0.2, 0.9], // -X face - blue
+        [0.9, 0.9, 0.1], // +Y face - yellow
+        [0.9, 0.9, 0.1], // -Y face - yellow
+        [1.0, 0.1, 0.1], // +Z face - red
+        [1.0, 0.1, 0.1], // -Z face - red
     ];
 
     // +X face

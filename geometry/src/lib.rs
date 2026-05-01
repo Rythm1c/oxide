@@ -20,9 +20,9 @@ pub enum Shape {
     },
 
     CubeSphere { 
-        radius: f32, 
+        radius      : f32, 
         subdivisions: u32, 
-        color: Option<[f32; 3]> 
+        color       : Option<[f32; 3]> 
     }
     /* 
 
@@ -49,12 +49,6 @@ impl Shape {
                 color } => {
                 cube_sphere::generate_cube_sphere(*radius, *subdivisions, *color)
             }
-            /* Shape::Triangle { color } => triangle::generate_triangle(*color),
-
-            Shape::Torus { major_radius, minor_radius, major_segments, minor_segments, color } => {
-            torus::generate_torus(*major_radius, *minor_radius, *major_segments, *minor_segments, *color)
-            }
-             */
         }
     }
 }
@@ -63,7 +57,7 @@ impl Shape {
 /// Represents mesh geometry with vertices and indices for GPU rendering.
 pub struct Geometry {
     vertices: Vec<Vertex>,
-    indices: Vec<u32>,
+    indices : Vec<u32>,
 }
 
 impl Geometry {

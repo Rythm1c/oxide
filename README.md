@@ -19,8 +19,13 @@ dependencies are in the .toml file.
 - [x] FPS style camera
 - [x] directional lighting
 - [x] Physical based rendering
-- [ ] physics(coming soon..)
-- [ ] shadow-map(coming soon..)
+- [ ] Multiple point lights
+- [ ] shadow-map
+- [ ] sky box
+- [ ] transparency
+- [ ] physics
+- [ ] animations
+
 
 ## samples
 sample render on linux
