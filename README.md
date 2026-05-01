@@ -21,6 +21,7 @@ dependencies are in the .toml file.
 - [x] Physical based rendering
 - [ ] Multiple point lights
 - [ ] shadow-map
+- [ ] GUI
 - [ ] sky box
 - [ ] transparency
 - [ ] physics
