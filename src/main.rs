@@ -25,7 +25,7 @@ fn main() -> anyhow::Result<()> {
                 size: 2.0,
                 color: None,
             },
-            Material::metal(true, 8.0, 0.6),
+            Material::stone(false, 8.0, 0.6),
         ),
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
     scene.add_object(
         object::Object::new(
             geometry::Shape::UVSphere {
-                radius: 0.5,
+                radius: 1.0,
                 segments: 40,
                 rings: 40,
                 color: None,
@@ -54,7 +54,7 @@ fn main() -> anyhow::Result<()> {
                 subdivisions: 50,
                 color: None,
             },
-            Material::rubber(false, 6.0, 0.4),
+            Material::rubber(false, 10.0, 0.4),
         ),
         Vec3::new(-3.0, 0.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),

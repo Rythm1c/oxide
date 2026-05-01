@@ -160,7 +160,7 @@ impl GraphicsPipeline {
             },
             // Depth attachment
             vk::AttachmentDescription {
-                format: vk::Format::D16_UNORM,
+                format: vk::Format::D32_SFLOAT,
                 samples: vk::SampleCountFlags::TYPE_1,
                 load_op: vk::AttachmentLoadOp::CLEAR,
                 store_op: vk::AttachmentStoreOp::DONT_CARE,
