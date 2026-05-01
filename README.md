@@ -16,11 +16,11 @@ dependencies are in the .toml file.
 - Ian Millington - GAME PHYSICS ENGINE DEVELOPMENT(second edition)
 
 ## Features inlcude:
-- FPS style camera
-- directional lighting
-- Physical based rendering
-- physics(coming soon..)
-- shadow-map(coming soon..)
+- [x] FPS style camera
+- [x] directional lighting
+- [x] Physical based rendering
+- [ ] physics(coming soon..)
+- [ ] shadow-map(coming soon..)
 
 ## samples
 sample render on linux
