@@ -128,7 +128,7 @@ impl Default for Material {
         Material { 
             metallic   : 0.5, 
             roughness  : 0.5, 
-            ao         : 0.05, 
+            ao         : 0.5, 
             use_checker: false, 
             divisions  : 0.0, 
             factor     : 1.0 }

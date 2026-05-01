@@ -1,17 +1,17 @@
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct MaterialUbo{
-    pub metallic   : f32,
     pub roughness  : f32,
+    pub metallic   : f32,
     pub ao         : f32,
 
-    pub _pad0: f32,
+    pub _pad0      : f32,
     // checker board stuff
     pub use_checker: f32,  // 0.0=solid, 1.0=checker
     pub divisions  : f32,   // number of checher boxes per face
     pub factor     : f32,    // darkness of the checker boxes(0.0 - 1.0)
 
-    pub _pad1 :f32
+    pub _pad1      :f32
 }
 
 impl Default for MaterialUbo {
@@ -19,7 +19,7 @@ impl Default for MaterialUbo {
         Self { 
             metallic   :0.5,
             roughness  :0.5,
-            ao         :0.05,
+            ao         :0.5,
             _pad0      :0.0,
             use_checker:0.0,
             divisions  :0.0,

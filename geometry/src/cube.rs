@@ -9,10 +9,10 @@ pub fn generate_cube(size: f32, color: Option<[f32; 3]>) -> (Vec<Vertex>, Vec<u3
     let face_colors = [
         [0.1, 0.2, 0.8], // +X face - blue
         [0.1, 0.2, 0.8], // -X face - blue
-        [8.0, 0.9, 0.05], // +Y face - yellow
-        [8.0, 0.9, 0.05], // -Y face - yellow
-        [0.9, 0.15, 0.05], // +Z face - red
-        [0.9, 0.15, 0.05], // -Z face - red
+        [1.0, 1.0, 0.0], // +Y face - yellow
+        [1.0, 1.0, 0.0], // -Y face - yellow
+        [1.0, 0.2, 0.1], // +Z face - red
+        [1.0, 0.2, 0.1], // -Z face - red
     ];
 
     let positions = [

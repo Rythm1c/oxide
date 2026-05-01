@@ -18,8 +18,8 @@ layout(set = 0, binding = 1) uniform LightUBO {
 // set = 1, binding = 0 — matches MaterialUbo Rust struct field order:
 //   roughness, metallic, ao, _pad0, useChecker, divisions, factor, _pad1
 layout(set = 1, binding = 0) uniform MaterialUBO {
-    float metallic;    // offset  0
-    float roughness;   // offset  4
+    float roughness;   // offset  0
+    float metallic;    // offset  4
     float ao;          // offset  8
     float _pad0;       // offset 12
 
@@ -28,6 +28,8 @@ layout(set = 1, binding = 0) uniform MaterialUBO {
     float factor;      // offset 24
     float _pad1;       // offset 28
 } material;
+
+const float PI = 3.14159265359;
 
 // ---------------------------------------------------------------------------
 // Checker board pattern
@@ -49,23 +51,36 @@ float checker(vec2 uv) {
 // PBR helper functions
 // ---------------------------------------------------------------------------
 
-float distributionGGX(vec3 N, vec3 H, float roughness) {
-    float a     = roughness * roughness;
-    float a2    = a * a;
-    float NdotH = max(dot(N, H), 0.0);
-    float denom = NdotH * NdotH * (a2 - 1.0) + 1.0;
-    return a2 / (3.14159265 * denom * denom);
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a      = roughness * roughness;
+    float a2     = a * a;
+    float NdotH  = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / denom;
 }
 
-float geometrySchlickGGX(float NdotX, float roughness) {
-    float k = (roughness + 1.0);
-    k = (k * k) / 8.0;
-    return NdotX / (NdotX * (1.0 - k) + k);
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
 }
 
-float geometrySmith(float NdotL, float NdotV, float roughness) {
-    return geometrySchlickGGX(NdotL, roughness)
-         * geometrySchlickGGX(NdotV, roughness);
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
 }
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
@@ -78,54 +93,56 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
 
 void main() {
     // Apply checker pattern if enabled
-    float check  = (material.useChecker > 0.5) ? checker(o_uv) : 1.0;
-    vec3  albedo = o_color * check;
+    float check = (material.useChecker > 0.5) ? checker(o_uv) : 1.0;
+    vec3 albedo = o_color * check;
+    //vec3 albedo = vec3(0.0, 1.0, 1.0) * check;
 
-    // Vectors
     vec3 N = normalize(o_normal);
     vec3 V = normalize(lightUBO.cameraPos.xyz - fragWorldPos);
-    vec3 L = normalize(-lightUBO.light_dir.xyz);  // negate: toward light
-    vec3 H = normalize(L + V);
 
-    float NdotL = max(dot(N, L), 0.0);
-    float NdotV = max(dot(N, V), 0.0);
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, albedo, material.metallic);
 
-    // F0: base reflectivity
-    // Dielectrics: 0.04 (most plastics/stone)
-    // Metals: use albedo (metals have coloured specular)
-    vec3 F0 = mix(vec3(0.04), albedo, material.metallic);
+    // reflectance equation
+    vec3 Lo = vec3(0.0);
 
-    // Cook-Torrance specular BRDF
-    float D = distributionGGX(N, H, material.roughness);
-    float G = geometrySmith(NdotL, NdotV, material.roughness);
-    vec3  F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+        // calculate per-light radiance
+    vec3 L = normalize(-lightUBO.light_dir.xyz);
+    vec3 H = normalize(V + L);
+    //float distance = length(lightPositions[i] - WorldPos);
+    //float attenuation = 1.0 / (distance * distance);
+    vec3 radiance = lightUBO.light_color.xyz;// * attenuation;
 
-    vec3 specular = (D * G * F) / max(4.0 * NdotL * NdotV, 0.001);
+        // Cook-Torrance BRDF
+    float NDF = DistributionGGX(N, H, material.roughness);
+    float G   = GeometrySmith(N, V, L, material.roughness);
+    vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
 
-    // Energy conservation
-    vec3 ks = F;
-    vec3 kd = (vec3(1.0) - ks) * (1.0 - material.metallic);
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+    vec3 specular = numerator / denominator;
 
-    // Lambertian diffuse (divided by PI for energy conservation)
-    vec3 diffuse = kd * albedo / 3.14159265;
+        // kS is equal to Fresnel
+    vec3 kS = F;
+    
+    vec3 kD = vec3(1.0) - kS;
 
-    // Incoming radiance: color × intensity
-    vec3 Li = lightUBO.light_color.xyz * lightUBO.light_color.w;
+    kD *= 1.0 - material.metallic;	  
 
-    // Direct lighting
-    vec3 Lo = (diffuse + specular) * Li * NdotL;
+        // scale light by NdotL
+    float NdotL = max(dot(N, L), 0.0);        
 
-    // Ambient (approximation of indirect light, scaled by AO)
-    vec3 ambient = lightUBO.ambient.xyz * albedo * material.ao;
+        // add to outgoing radiance Lo
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL;  
+
+    // ambient lighting 
+    vec3 ambient = vec3(0.03) * albedo * material.ao;
 
     vec3 color = ambient + Lo;
 
-    // Reinhard tone mapping — compresses HDR to [0,1]
-    // Without this, bright specular highlights blow out to pure white
-   // color = color / (color + vec3(1.0));
-
-    // Gamma correction — convert linear to sRGB for display
-    // Without this, colours look washed out and too bright
+    // HDR tonemapping
+    color = color / (color + vec3(1.0));
+    // gamma correct
     //color = pow(color, vec3(1.0 / 2.2));
 
     uFragColor = vec4(color, 1.0);

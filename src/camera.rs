@@ -69,8 +69,8 @@ impl Camera {
         self.pitch = self.pitch.clamp(-89.0, 89.0);
 
         // Update orientation quaternion from euler angles
-        let yaw_quat     = Quat::rotation_y(self.yaw);
-        let pitch_quat   = Quat::rotation_x(self.pitch);
+        let yaw_quat   = Quat::rotation_y(self.yaw);
+        let pitch_quat = Quat::rotation_x(self.pitch);
         self.orientation = yaw_quat * pitch_quat;
     }
 
@@ -120,7 +120,7 @@ impl Camera {
     }
 
     fn strafe(&mut self, delta: f32) {
-        let right = cross(&self.get_forward(), &-Vec3::Y).unit();
+        let right = cross(self.get_forward(), -Vec3::Y).unit();
         //self.up = cross(&right, &self.get_forward()).unit();
         self.pos = self.pos + right * self.speed * delta;
     }
@@ -139,23 +139,19 @@ impl Camera {
     }
 
     pub fn view_matrix(&self) -> Mat4x4 {
-        let view = mat4x4::look_at(self.pos, self.pos + self.get_forward(), -Vec3::Y);
+        let view = mat4x4::look_at(self.pos, self.pos + self.get_forward(), Vec3::Y);
 
         mat4x4::transpose(&view) // Transpose for column-major order
     }
 
     pub fn projection_matrix(&self) -> Mat4x4 {
         let mut projection = mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
-        projection = mat4x4::transpose(&projection); // Transpose for column-major order
 
         projection.data[1][1] *= -1.0; // Flip Y for Vulkan's coordinate system
 
-        projection
+        mat4x4::transpose(&projection) // Transpose for column-major order
     }
 
-    pub fn view_projection_matrix(&self) -> Mat4x4 {
-        mat4x4::transpose(&(self.projection_matrix() * self.view_matrix()))
-    }
 
     // ==================== Configuration ====================
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
@@ -171,8 +167,6 @@ impl Camera {
     }
 
     pub fn get_ubo(&self) -> CameraUbo {
-        let dir = self.get_forward();
-
         CameraUbo {
             view     : self.view_matrix().data,
             proj     : self.projection_matrix().data,

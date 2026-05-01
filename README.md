@@ -10,9 +10,17 @@ dependencies are in the .toml file.
 ### online 
 - https://vulkan-tutorial.com
 - https://www.songho.ca/
+- https://learnopengl.com/
 ### Text/Books
 - gabor szauer - hands on c++ game animation programming pack 
-- IAN MILLINGTON - GAME PHYSICS ENGINE DEVELOPMENT(second edition)
+- Ian Millington - GAME PHYSICS ENGINE DEVELOPMENT(second edition)
+
+## Features inlcude:
+- FPS style camera
+- directional lighting
+- Physical based rendering
+- physics(coming soon..)
+- shadow-map(coming soon..)
 
 ## samples
 sample render on linux
@@ -21,9 +29,5 @@ sample render on linux
 sample render on windows
 ![Alt text](./images/sample_2.png "eclipse")
 
-## Features inlcude:
-- FPS style camera
-- directional lighting
-- Physical based rendering
-- physics(coming soon..)
-- shadow-map(coming soon..)
+sample PBR render(widows)
+![Alt text](./images/sample_3.png "pbr sample")

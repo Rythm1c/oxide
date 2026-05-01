@@ -111,7 +111,7 @@ impl Scene {
             camera_pos : [cpos[0], cpos[1], cpos[2], 0.0],
             ambient    : [amb[0], amb[1], amb[2], 0.0],
             light_dir  : [dir[0], dir[1], dir[2], 0.0],
-            light_color: [col[0], col[1], col[2], 2.0],
+            light_color: [col[0], col[1], col[2], 1.0],
         }
     }
 
@@ -143,8 +143,8 @@ impl Default for Light {
     fn default() -> Self {
         Light {
             ambient  : [0.1; 3],
-            color    : [1.0; 3],
-            direction: [0.6, 1.0, -0.4],
+            color    : [10.0; 3],
+            direction: [0.2, -1.0, -0.5],
         }
     }
 }

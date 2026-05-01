@@ -363,9 +363,9 @@ pub fn look_at(eye: Vec3, front: Vec3, up: Vec3) -> Mat4x4 {
     // camera direction
     let cd = (eye - front).unit();
     // get right vector
-    let cr = cross(&up, &cd).unit();
+    let cr = cross(up, cd).unit();
     // get up vector
-    let cu = cross(&cd, &cr).unit();
+    let cu = cross(cd, cr).unit();
 
     // translation vector
     let xw = -(eye.x * cr.x) - (eye.y * cr.y) - (eye.z * cr.z);

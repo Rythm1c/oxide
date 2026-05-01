@@ -208,7 +208,7 @@ impl Mul<Vec3> for Quat {
     fn mul(self, rhs: Vec3) -> Self::Output {
         let a = self.axis() * 2.0 * dot(&self.axis(), &rhs);
         let b = rhs * (self.s * self.s - dot(&self.axis(), &self.axis()));
-        let c = cross(&self.axis(), &rhs) * 2.0 * self.s;
+        let c = cross(self.axis(), rhs) * 2.0 * self.s;
 
         a + b + c
     }

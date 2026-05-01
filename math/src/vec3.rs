@@ -100,7 +100,7 @@ pub fn reflect(incident: &Vec3, normal: &Vec3) -> Vec3 {
     *incident - 2.0 * dot(incident, normal) * *normal
 }
 //get the cross product between two vectors
-pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
+pub fn cross(v1: Vec3, v2: Vec3) -> Vec3 {
     Vec3::new(
         v1.y * v2.z - v1.z * v2.y,
         v1.z * v2.x - v1.x * v2.z,
