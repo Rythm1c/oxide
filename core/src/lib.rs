@@ -6,6 +6,7 @@ pub mod drawable;
 pub mod pipeline;
 pub mod renderer;
 pub mod shader;
+pub mod shadowmap;
 pub mod swapchain;
 pub mod texture;
 pub mod ubo;
