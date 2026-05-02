@@ -186,7 +186,7 @@ impl VkContext {
         let depth_texture = Texture::create_depth(
             Arc::clone(&device_ctx),
             swapchain_ctx.surface_resolution,
-            vk::Format::D16_UNORM,
+            vk::Format::D32_SFLOAT,
         )?;
 
         record_submit_commandbuffer(
