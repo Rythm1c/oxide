@@ -125,6 +125,8 @@ impl ApplicationHandler for App {
         self.vulkan_core =
             Some(VulkanCore::new("Vulkan App", self.window.as_ref().unwrap()).unwrap());
 
+        println!("move camera with w,a,s,d keys\nrotate camera by right clicking and dragging");
+        
         // Upload all scene objects to GPU
         if let Some(core) = &mut self.vulkan_core {
             let device_ctx = Arc::clone(&core.context.device_ctx);

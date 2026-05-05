@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
                 subdivisions: 400,
                 color: Some([1.0; 3]),
             },
-            Material::polished(true, 300.0, 0.2),
+            Material::polished(true, 600.0, 0.01),
         ),
         Vec3::new(0.0, -1002.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),

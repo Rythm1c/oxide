@@ -5,6 +5,7 @@ fn main() {
     let shaders = [
         ("shaders/vert.glsl", "shaders/vert.spv", "vert"),
         ("shaders/frag.glsl", "shaders/frag.spv", "frag"),
+        ("shaders/shadow.glsl", "shaders/shadow.spv", "vert"),
     ];
 
     // Tell cargo to re-run this script if ANY shader source changes.
