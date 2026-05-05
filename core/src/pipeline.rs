@@ -2,6 +2,7 @@ use ash::vk::{self, DescriptorSetLayout};
 use std::sync::Arc;
 
 use super::context::VkContext;
+use super::device::DeviceContext;
 use crate::shader::ShaderModule;
 use crate::vertex::Vertex;
 
@@ -398,6 +399,136 @@ impl Drop for GraphicsPipeline {
             device.destroy_render_pass(self.renderpass, None);
             device.destroy_pipeline_layout(self.layout, None);
             device.destroy_pipeline(self.handle, None);
+        }
+    }
+}
+
+pub struct ShadowPipeline {
+    ctx: Arc<DeviceContext>,
+    render_pass: vk::RenderPass,
+    handle: vk::Pipeline,
+    layout: vk::PipelineLayout,
+    framebuffer: vk::Framebuffer,
+}
+
+impl ShadowPipeline {
+    pub fn new(ctx: Arc<DeviceContext>, view: vk::ImageView, res: vk::Extent2D) -> Self {
+        let render_pass = Self::create_renderpass(Arc::clone(&ctx));
+        let framebuffer = Self::create_framebuffer(Arc::clone(&ctx), view, render_pass, res.clone());
+        let layout = Self::create_pipeline_layout(Arc::clone(&ctx));
+        let handle = Self::create_pipeline(Arc::clone(&ctx), render_pass);
+
+        Self {
+            ctx,
+            render_pass,
+            handle,
+            layout,
+            framebuffer,
+        }
+    }
+
+    fn create_renderpass(ctx: Arc<DeviceContext>) -> vk::RenderPass {
+        let depth_attachment = vk::AttachmentDescription::default()
+            .format(vk::Format::D32_SFLOAT)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+
+        let depth_ref = vk::AttachmentReference::default()
+            .attachment(0)
+            .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+        let subpass = vk::SubpassDescription::default()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&[])
+            .depth_stencil_attachment(&depth_ref);
+
+        let deps = [
+            vk::SubpassDependency::default()
+                .src_subpass(vk::SUBPASS_EXTERNAL)
+                .dst_subpass(0)
+                .src_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
+                .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
+                .src_access_mask(vk::AccessFlags::SHADER_READ)
+                .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+                .dependency_flags(vk::DependencyFlags::BY_REGION),
+            vk::SubpassDependency::default()
+                .src_subpass(0)
+                .dst_subpass(vk::SUBPASS_EXTERNAL)
+                .src_stage_mask(vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
+                .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
+                .src_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+                .dst_access_mask(vk::AccessFlags::SHADER_READ)
+                .dependency_flags(vk::DependencyFlags::BY_REGION),
+        ];
+
+        let attachments = [depth_attachment];
+        let subpasses = [subpass];
+        let create_info = vk::RenderPassCreateInfo::default()
+            .attachments(&attachments)
+            .subpasses(&subpasses)
+            .dependencies(&deps);
+
+        unsafe {
+            ctx.device
+                .create_render_pass(&create_info, None)
+                .unwrap_or_else(|_| panic!("failed to create shadow map renderpass!"))
+        }
+    }
+    fn create_framebuffer(
+        ctx: Arc<DeviceContext>,
+        depth_view: vk::ImageView,
+        render_pass: vk::RenderPass,
+        res: vk::Extent2D,
+    ) -> vk::Framebuffer {
+        let attachments = [depth_view];
+
+        let create_info = vk::FramebufferCreateInfo::default()
+            .attachment_count(1)
+            .attachments(&attachments)
+            .width(res.width)
+            .height(res.height)
+            .render_pass(render_pass);
+
+        unsafe {
+            ctx.device
+                .create_framebuffer(&create_info, None)
+                .unwrap_or_else(|_| panic!("Failed to create shadowmap framebuffer"))
+        }
+    }
+
+    fn create_pipeline_layout(ctx: Arc<DeviceContext>) -> vk::PipelineLayout {
+        let ranges = [PushConstants::push_range()];
+        unsafe {
+            ctx
+                .device
+                .create_pipeline_layout(
+                    &vk::PipelineLayoutCreateInfo::default()
+                        .push_constant_ranges(&ranges),// fix this
+                    None,
+                )
+                .expect("Failed to create pipeline layout")
+        }
+    }
+
+    fn create_pipeline(ctx: Arc<DeviceContext>, render_pass: vk::RenderPass) -> vk::Pipeline {
+        let mut pipeline = vk::Pipeline::null();
+
+        pipeline
+    }
+}
+
+impl Drop for ShadowPipeline {
+    fn drop(&mut self) {
+        unsafe {
+            self.ctx.device.destroy_render_pass(self.render_pass, None);
+            self.ctx.device.destroy_framebuffer(self.framebuffer, None);
+            self.ctx.device.destroy_pipeline_layout(self.layout, None);
+            self.ctx.device.destroy_pipeline(self.handle, None);
         }
     }
 }
