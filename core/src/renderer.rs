@@ -1,6 +1,6 @@
 use super::context::{VkContext, record_submit_commandbuffer_no_wait};
 use super::descriptor::GlobalDescriptorSet;
-use super::pipeline::GraphicsPipeline;
+use super::pipeline::RenderPipeline;
 use crate::drawable::RenderObject;
 use ash::vk;
 use std::sync::Arc;
@@ -84,7 +84,7 @@ impl Renderer {
     /// every draw call, so the shader sees each object's correct MVP matrix.
     pub fn render(
         &mut self,
-        pipeline: &GraphicsPipeline,
+        pipeline: &RenderPipeline,
         globals: &GlobalDescriptorSet,
         render_objects: &Vec<RenderObject>,
     ) -> anyhow::Result<()> {

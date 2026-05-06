@@ -6,11 +6,7 @@ use engine_core::{
         GlobalDescriptorSet,
         MaterialAllocator
         }, 
-    pipeline::{
-        GraphicsPipeline, 
-        GraphicsPipelineConfig, 
-        PushConstants
-    }, 
+    pipeline::RenderPipeline, 
     renderer::Renderer
 };
 
@@ -25,7 +21,7 @@ use winit::window::{Window, WindowId};
 
 struct VulkanCore {
     renderer          : Renderer,
-    pipeline          : GraphicsPipeline,
+    pipeline          : RenderPipeline,
     globals           : GlobalDescriptorSet,
     material_allocator: MaterialAllocator,
     context           : Arc<VkContext>,
@@ -48,20 +44,13 @@ impl VulkanCore {
         //100 objects for now
         let material_allocator = 
             MaterialAllocator::new(Arc::clone(&context.device_ctx), 100)?;
-        
-        let cfg = GraphicsPipelineConfig::default()
-            .vertex_shader("shaders/vert.spv")
-            .fragment_shader("shaders/frag.spv")
-            .cull_mode(ash::vk::CullModeFlags::BACK)
-            .polygon_mode(ash::vk::PolygonMode::FILL)
-            .descriptor_layouts(vec![globals.layout(), material_allocator.layout()])
-            .push_constant_ranges(vec![PushConstants::push_range()]);
 
-        let pipeline = GraphicsPipeline::create(&cfg, Arc::clone(&context))?;
+        let pipeline = RenderPipeline::create(
+            Arc::clone(&context),
+            globals.layout(), 
+            material_allocator.layout())?;
 
         let renderer = Renderer::new(Arc::clone(&context));
-
-        
 
         Ok(VulkanCore {
             globals,
