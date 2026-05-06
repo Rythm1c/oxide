@@ -58,6 +58,32 @@ impl PushConstants {
     }
 }
 
+pub struct ShadowMapPushConstants {
+    pub proj_view: [[f32; 4]; 4],
+    pub model: [[f32; 4]; 4],
+}
+
+impl ShadowMapPushConstants {
+    pub fn new(model: [[f32; 4]; 4], proj_view: [[f32; 4]; 4]) -> Self {
+        Self { proj_view, model }
+    }
+
+    pub fn as_bytes(&self)-> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self as *const Self as *const u8,
+                std::mem::size_of::<Self>(),
+            )
+        }
+    }
+
+    pub fn push_range() -> vk::PushConstantRange {
+        vk::PushConstantRange::default()
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .offset(0)
+            .size(std::mem::size_of::<Self>() as u32)
+    }
+}
 // ---------------------------------------------------------------------------
 // GraphicsPipeline
 // ---------------------------------------------------------------------------
@@ -354,20 +380,20 @@ pub struct ShadowPipeline {
 }
 
 impl ShadowPipeline {
-    pub fn new(ctx: Arc<DeviceContext>, view: vk::ImageView, res: vk::Extent2D) -> Self {
+    pub fn new(ctx: Arc<DeviceContext>, view: vk::ImageView, res: vk::Extent2D) -> anyhow::Result<Self> {
         let render_pass = Self::create_renderpass(Arc::clone(&ctx));
         let framebuffer =
             Self::create_framebuffer(Arc::clone(&ctx), view, render_pass, res.clone());
         let layout = Self::create_pipeline_layout(Arc::clone(&ctx));
-        let handle = Self::create_pipeline(Arc::clone(&ctx), render_pass);
+        let handle = Self::create_pipeline(Arc::clone(&ctx), layout, render_pass, res)?;
 
-        Self {
+        Ok(Self {
             ctx,
             render_pass,
             handle,
             layout,
             framebuffer,
-        }
+        })
     }
 
     fn create_renderpass(ctx: Arc<DeviceContext>) -> vk::RenderPass {
@@ -445,7 +471,7 @@ impl ShadowPipeline {
     }
 
     fn create_pipeline_layout(ctx: Arc<DeviceContext>) -> vk::PipelineLayout {
-        let ranges = [PushConstants::push_range()];
+        let ranges = [ShadowMapPushConstants::push_range()];
         unsafe {
             ctx.device
                 .create_pipeline_layout(
@@ -456,10 +482,104 @@ impl ShadowPipeline {
         }
     }
 
-    fn create_pipeline(ctx: Arc<DeviceContext>, render_pass: vk::RenderPass) -> vk::Pipeline {
-        let mut pipeline = vk::Pipeline::null();
+    fn create_pipeline(
+        ctx: Arc<DeviceContext>,
+        layout: vk::PipelineLayout,
+        render_pass: vk::RenderPass,
+        res: vk::Extent2D
+    ) -> anyhow::Result<vk::Pipeline> {
+        let vertex_shader = ShaderModule::load_from_file(Arc::clone(&ctx), "shaders/shadow.spv")?;
 
-        pipeline
+        let shader_entry = c"main";
+        let stages = vec![
+            vk::PipelineShaderStageCreateInfo::default()
+                .module(vertex_shader.module)
+                .name(shader_entry)
+                .stage(vk::ShaderStageFlags::VERTEX),
+        ];
+
+        let attribute_descriptions = Vertex::get_attribute_descriptions();
+        let binding_descriptions = [Vertex::get_binding_description()];
+        let vertex_input = vk::PipelineVertexInputStateCreateInfo::default()
+            .vertex_attribute_descriptions(&attribute_descriptions)
+            .vertex_binding_descriptions(&binding_descriptions);
+
+        let input_assembly = vk::PipelineInputAssemblyStateCreateInfo::default()
+            .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
+
+        //let resolution = vk::Extent2D::default().height(2048u32).width(2048u32);
+        let viewports = vec![
+            vk::Viewport::default()
+                .x(0.0)
+                .y(0.0)
+                .width(res.width as f32)
+                .height(res.height as f32)
+                .min_depth(0.0)
+                .max_depth(1.0),
+        ];
+        let scissors = vec![res.into()];
+
+        let viewport_state = vk::PipelineViewportStateCreateInfo::default()
+            .viewports(&viewports)
+            .scissors(&scissors);
+
+        let rasterization = vk::PipelineRasterizationStateCreateInfo::default()
+            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+            .line_width(1.0)
+            .polygon_mode(vk::PolygonMode::FILL)
+            .cull_mode(vk::CullModeFlags::FRONT)
+            .depth_bias_enable(true)
+            .depth_bias_constant_factor(4.0)
+            .depth_bias_slope_factor(2.5);
+
+        let multisample = vk::PipelineMultisampleStateCreateInfo::default()
+            .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+
+        let noop_stencil = vk::StencilOpState::default()
+            .fail_op(vk::StencilOp::KEEP)
+            .pass_op(vk::StencilOp::KEEP)
+            .depth_fail_op(vk::StencilOp::KEEP)
+            .compare_op(vk::CompareOp::ALWAYS);
+
+        let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
+            .depth_test_enable(true)
+            .depth_write_enable(true)
+            .depth_compare_op(vk::CompareOp::LESS)
+            .front(noop_stencil)
+            .back(noop_stencil)
+            .max_depth_bounds(1.0);
+
+        let color_blend_attachments = [vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(false)
+            .color_write_mask(vk::ColorComponentFlags::RGBA)];
+
+        let color_blend =
+            vk::PipelineColorBlendStateCreateInfo::default().attachments(&color_blend_attachments);
+
+        let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+        let dynamic_state =
+            vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
+
+        Ok(unsafe {
+            ctx.device
+                .create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    &[vk::GraphicsPipelineCreateInfo::default()
+                        .stages(&stages)
+                        .vertex_input_state(&vertex_input)
+                        .input_assembly_state(&input_assembly)
+                        .viewport_state(&viewport_state)
+                        .rasterization_state(&rasterization)
+                        .multisample_state(&multisample)
+                        .depth_stencil_state(&depth_stencil)
+                        .color_blend_state(&color_blend)
+                        .dynamic_state(&dynamic_state)
+                        .layout(layout)
+                        .render_pass(render_pass)],
+                    None,
+                )
+                .expect("Failed to create graphics pipeline")[0]
+        })
     }
 }
 

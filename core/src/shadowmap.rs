@@ -3,45 +3,26 @@ use std::sync::Arc;
 use anyhow::Ok;
 use ash::vk;
 
-use crate::{device::DeviceContext, texture::Texture};
 use super::pipeline::ShadowPipeline;
-
-pub struct ShadowMapConfig {
-    ctx: Arc<DeviceContext>,
-    vert_src: String,
-    img_width: u32,
-    img_height: u32,
-}
-
-
+use crate::{device::DeviceContext, texture::Texture};
 
 pub struct ShadowMap {
     ctx: Arc<DeviceContext>,
     shadow_pipeline: ShadowPipeline,
-    resolution: vk::Extent2D,
     map: Texture,
     sampler: vk::Sampler,
 }
 
 impl ShadowMap {
-    pub fn new(cfg: &ShadowMapConfig) -> anyhow::Result<Self> {
-        let resolution = vk::Extent2D {
-            width: cfg.img_width,
-            height: cfg.img_height,
-        };
-        let map = Texture::create_depth(
-            Arc::clone(&cfg.ctx),
-            resolution.clone(),
-            vk::Format::D32_SFLOAT,
-        )?;
-        let sampler = Self::create_sampler(Arc::clone(&cfg.ctx));
-
-        let shadow_pipeline = ShadowPipeline::new(Arc::clone(&cfg.ctx), map.view, resolution);
+    pub fn new(ctx: Arc<DeviceContext>, width: u32, height: u32) -> anyhow::Result<Self> {
+        let resolution = vk::Extent2D::default().width(width).height(height);
+        let map = Texture::create_depth(Arc::clone(&ctx), resolution, vk::Format::D32_SFLOAT)?;
+        let sampler = Self::create_sampler(Arc::clone(&ctx));
+        let shadow_pipeline = ShadowPipeline::new(Arc::clone(&ctx), map.view, resolution)?;
 
         Ok(Self {
-            ctx: Arc::clone(&cfg.ctx),
+            ctx: Arc::clone(&ctx),
             shadow_pipeline,
-            resolution,
             map,
             sampler,
         })
