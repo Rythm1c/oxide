@@ -41,7 +41,7 @@ float shadowPCF(vec4 fragPos) {
 
     if (projCoords.z > 1.0) return 1.0;
 
-    float shadow   = 0.0;
+    float shadow    = 0.0;
     vec2  texelSize = 1.0 / textureSize(shadowMap, 0);
 
     // 3x3 PCF kernel -- 9 samples
@@ -162,7 +162,7 @@ void main() {
     float shadow =  shadowPCF(lightUBO.perpective * fragWorldPos);
 
         // add to outgoing radiance Lo
-    Lo += (kD * albedo / PI + specular) * radiance * NdotL * max(shadow, 0.1);  
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadow;  
 
     // ambient lighting 
     vec3 ambient = vec3(0.03) * albedo * material.ao;

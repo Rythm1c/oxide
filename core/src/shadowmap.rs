@@ -42,6 +42,7 @@ impl ShadowMap {
             .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_BORDER)
             .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_BORDER)
             .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_BORDER)
+            .border_color(vk::BorderColor::FLOAT_OPAQUE_WHITE)
             .compare_enable(true)
             .compare_op(vk::CompareOp::LESS_OR_EQUAL)
             .mipmap_mode(vk::SamplerMipmapMode::LINEAR)

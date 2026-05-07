@@ -98,9 +98,9 @@ impl Renderer {
         let device = ctx.device();
         let frame = self.current_frame;
 
-        let cmd = self.draw_command_buffers[frame];
+        let cmd             = self.draw_command_buffers[frame];
         let image_available = self.image_available_semaphores[frame];
-        let fence = self.in_flight_fences[frame];
+        let fence           = self.in_flight_fences[frame];
 
         // IMPORTANT: Wait for this frame's fence BEFORE reusing its semaphores.
         // This ensures the previous use of image_available semaphore has been fully consumed.

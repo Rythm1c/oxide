@@ -3,6 +3,7 @@ use ash::vk;
 use std::sync::Arc;
 
 use crate::device::DeviceContext;
+
 use crate::utils::find_memorytype_index;
 
 /// Defines the type and usage of a texture
@@ -24,10 +25,10 @@ impl TextureType {
     /// Get the Vulkan image usage flags for this texture type
     fn usage_flags(&self) -> vk::ImageUsageFlags {
         match self {
-            TextureType::Depth => vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-            TextureType::Color => vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
-            TextureType::Storage => vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_DST,
-            TextureType::Sampled => vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            TextureType::Depth     => vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            TextureType::Color     => vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
+            TextureType::Storage   => vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_DST,
+            TextureType::Sampled   => vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
             TextureType::ShadowMap => vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED
         }
     }
@@ -35,32 +36,32 @@ impl TextureType {
     /// Get the image aspect flags for this texture type
     fn aspect_flags(&self) -> vk::ImageAspectFlags {
         match self {
-            TextureType::Depth => vk::ImageAspectFlags::DEPTH,
-            TextureType::Color => vk::ImageAspectFlags::COLOR,
-            TextureType::Storage => vk::ImageAspectFlags::COLOR,
-            TextureType::Sampled => vk::ImageAspectFlags::COLOR,
+            TextureType::Depth     => vk::ImageAspectFlags::DEPTH,
+            TextureType::Color     => vk::ImageAspectFlags::COLOR,
+            TextureType::Storage   => vk::ImageAspectFlags::COLOR,
+            TextureType::Sampled   => vk::ImageAspectFlags::COLOR,
             TextureType::ShadowMap => vk::ImageAspectFlags::DEPTH
         }
     }
 }
 
 pub struct Texture {
-    ctx: Arc<DeviceContext>,
-    pub image: vk::Image,
-    pub view: vk::ImageView,
-    pub memory: vk::DeviceMemory,
-    pub format: vk::Format,
-    pub extent: vk::Extent2D,
+    ctx             : Arc<DeviceContext>,
+    pub image       : vk::Image,
+    pub view        : vk::ImageView,
+    pub memory      : vk::DeviceMemory,
+    pub format      : vk::Format,
+    pub extent      : vk::Extent2D,
     pub texture_type: TextureType,
 }
 
 impl Texture {
     /// Create a texture of the specified type
     pub fn new(
-        ctx: Arc<DeviceContext>,
+        ctx         : Arc<DeviceContext>,
         texture_type: TextureType,
-        extent: vk::Extent2D,
-        format: vk::Format,
+        extent      : vk::Extent2D,
+        format      : vk::Format,
     ) -> anyhow::Result<Self> {
         let device = &ctx.device;
 
@@ -75,7 +76,7 @@ impl Texture {
             .usage(texture_type.usage_flags())
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
-        let image = unsafe { device.create_image(&image_info, None)? };
+        let image   = unsafe { device.create_image(&image_info, None)? };
         let mem_req = unsafe { device.get_image_memory_requirements(image) };
 
         let mem_index = find_memorytype_index(
@@ -126,7 +127,7 @@ impl Texture {
 
     /// Create a depth/stencil texture (convenience method)
     pub fn create_depth(
-        ctx: Arc<DeviceContext>,
+        ctx   : Arc<DeviceContext>,
         extent: vk::Extent2D,
         format: vk::Format,
     ) -> anyhow::Result<Self> {
@@ -134,7 +135,7 @@ impl Texture {
     }
 
     pub fn create_shadow_map(
-        ctx: Arc<DeviceContext>,
+        ctx   : Arc<DeviceContext>,
         extent: vk::Extent2D,
         format: vk::Format,
     ) -> anyhow::Result<Self> {
@@ -143,7 +144,7 @@ impl Texture {
 
     /// Create a color texture (convenience method)
     pub fn create_color(
-        ctx: Arc<DeviceContext>,
+        ctx   : Arc<DeviceContext>,
         extent: vk::Extent2D,
         format: vk::Format,
     ) -> anyhow::Result<Self> {
@@ -152,7 +153,7 @@ impl Texture {
 
     /// Create a storage texture (convenience method)
     pub fn create_storage(
-        ctx: Arc<DeviceContext>,
+        ctx   : Arc<DeviceContext>,
         extent: vk::Extent2D,
         format: vk::Format,
     ) -> anyhow::Result<Self> {
@@ -161,7 +162,7 @@ impl Texture {
 
     /// Create a sampled texture (convenience method)
     pub fn create_sampled(
-        ctx: Arc<DeviceContext>,
+        ctx   : Arc<DeviceContext>,
         extent: vk::Extent2D,
         format: vk::Format,
     ) -> anyhow::Result<Self> {
@@ -173,8 +174,8 @@ impl Drop for Texture {
     fn drop(&mut self) {
         unsafe {
             self.ctx.device.destroy_image_view(self.view, None);
-            self.ctx.device.free_memory(self.memory, None);
-            self.ctx.device.destroy_image(self.image, None);
+            self.ctx.device.free_memory(self.memory,      None);
+            self.ctx.device.destroy_image(self.image,     None);
         }
     }
 }
