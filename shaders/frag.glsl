@@ -3,17 +3,20 @@
 layout(location = 0) in vec3 o_normal;
 layout(location = 1) in vec2 o_uv;
 layout(location = 2) in vec3 o_color;
-layout(location = 3) in vec3 fragWorldPos;
+layout(location = 3) in vec4 fragWorldPos;
+//layout(location = 4) in vec4 lightSpacePos;
 
 layout(location = 0) out vec4 uFragColor;
 
 // set = 0, binding = 1 — matches LightUbo Rust struct field order
 layout(set = 0, binding = 1) uniform LightUBO {
     vec4 cameraPos;    // offset  0 — xyz = camera world position
-    vec4 ambient;      // offset 16 — xyz = ambient color
     vec4 light_dir;    // offset 32 — xyz = light direction (toward scene)
     vec4 light_color;  // offset 48 — xyz = color, w = intensity
+    mat4 perpective;   // lights projection matrix
 } lightUBO;
+
+layout(set = 0, bindinf = 2) uniform sampler2D shadowMap;
 
 // set = 1, binding = 0 — matches MaterialUbo Rust struct field order:
 //   roughness, metallic, ao, _pad0, useChecker, divisions, factor, _pad1
@@ -30,6 +33,21 @@ layout(set = 1, binding = 0) uniform MaterialUBO {
 } material;
 
 const float PI = 3.14159265359;
+
+float shadow(vec4 fragPos) {
+    vec3 projCoords = fragPos.xyz / fragPos.w;
+    
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
+
+    if (projCoords.z > 1.0) return 1.0;
+
+    if(texture2D(shadowMap, projCoords.xy).z < projCoords.z) {
+        return 0.5;
+    }
+
+    return 1.0; 
+
+}
 
 // ---------------------------------------------------------------------------
 // Checker board pattern
@@ -133,7 +151,7 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);        
 
         // add to outgoing radiance Lo
-    Lo += (kD * albedo / PI + specular) * radiance * NdotL;  
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadow(lightUBO.perpective * fragWorldPos);  
 
     // ambient lighting 
     vec3 ambient = vec3(0.03) * albedo * material.ao;

@@ -2,6 +2,7 @@ use super::context::{VkContext, record_submit_commandbuffer_no_wait};
 use super::descriptor::GlobalDescriptorSet;
 use super::pipeline::RenderPipeline;
 use crate::drawable::RenderObject;
+use crate::pipeline::PushConstants;
 use ash::vk;
 use std::sync::Arc;
 
@@ -178,17 +179,17 @@ impl Renderer {
                         pipeline.layout,
                         vk::ShaderStageFlags::VERTEX,
                         0,
-                        obj.push_constants.as_bytes(),
+                        PushConstants::from_model_matrix(obj.model_matrix).as_bytes(),
                     );
 
                     device.cmd_bind_descriptor_sets(
-                    cmd,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    pipeline.layout,
-                    1,
-                    &[obj.material_desc.set],
-                    &[],
-                );
+                        cmd,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.layout,
+                        1,
+                        &[obj.material_desc.set],
+                        &[],
+                    );
 
                     device.cmd_bind_vertex_buffers(cmd, 0, &[obj.vertex_buffer.raw], &[0]);
 

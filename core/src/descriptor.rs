@@ -1,6 +1,7 @@
 use ash::vk;
 use std::sync::Arc;
 
+use crate::shadowmap::ShadowMap;
 use crate::ubo::MaterialUbo;
 
 use super::buffer::{Buffer, BufferUsage};
@@ -9,18 +10,22 @@ use super::ubo::{CameraUbo, LightUbo};
 
 // global set for the camera and light UBOs, which are shared across all draw calls
 pub struct GlobalDescriptorSet {
-    ctx           : Arc<DeviceContext>,
+    ctx: Arc<DeviceContext>,
 
-    layout        : vk::DescriptorSetLayout,
-    pool          : vk::DescriptorPool,
-    sets          : Vec<vk::DescriptorSet>, // one per frame in flight
+    layout: vk::DescriptorSetLayout,
+    pool: vk::DescriptorPool,
+    sets: Vec<vk::DescriptorSet>, // one per frame in flight
 
     camera_buffers: Vec<Buffer>,
-    light_buffers : Vec<Buffer>,
+    light_buffers: Vec<Buffer>,
 }
 
 impl GlobalDescriptorSet {
-    pub fn new(ctx: Arc<DeviceContext>, frames_in_flight: usize) -> anyhow::Result<Self> {
+    pub fn new(
+        ctx: Arc<DeviceContext>,
+        shadow_map: &ShadowMap,
+        frames_in_flight: usize,
+    ) -> anyhow::Result<Self> {
         let device = &ctx.device;
 
         let bindings = [
@@ -34,6 +39,11 @@ impl GlobalDescriptorSet {
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(2)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
         ];
 
         let layout = unsafe {
@@ -44,11 +54,9 @@ impl GlobalDescriptorSet {
         };
 
         // We need `frames_in_flight` sets, each with 2 UBO descriptors.
-        let pool_sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::UNIFORM_BUFFER,
-            // 2 bindings × frames_in_flight
-            descriptor_count: (2 * frames_in_flight) as u32,
-        }];
+        let pool_sizes = [vk::DescriptorPoolSize::default()
+            .ty(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_count((2 * frames_in_flight) as u32)];
 
         let pool = unsafe {
             device.create_descriptor_pool(
@@ -80,6 +88,7 @@ impl GlobalDescriptorSet {
                 camera_size,
                 BufferUsage::UNIFORM,
             )?);
+
             light_buffers.push(Buffer::new(
                 Arc::clone(&ctx),
                 light_size,
@@ -87,25 +96,26 @@ impl GlobalDescriptorSet {
             )?);
         }
 
-        let mut descriptor_writes = Vec::with_capacity(frames_in_flight * 2);
-
-        let mut camera_infos: Vec<[vk::DescriptorBufferInfo; 1]> =
-            Vec::with_capacity(frames_in_flight);
-        let mut light_infos: Vec<[vk::DescriptorBufferInfo; 1]> =
-            Vec::with_capacity(frames_in_flight);
+        let mut descriptor_writes = Vec::with_capacity(frames_in_flight * 3);
+        let mut camera_infos: Vec<[vk::DescriptorBufferInfo; 1]> = Vec::with_capacity(frames_in_flight);
+        let mut light_infos: Vec<[vk::DescriptorBufferInfo; 1]> = Vec::with_capacity(frames_in_flight);
 
         for i in 0..frames_in_flight {
-            camera_infos.push([vk::DescriptorBufferInfo {
-                buffer: camera_buffers[i].raw,
-                offset: 0,
-                range: camera_size,
-            }]);
-            light_infos.push([vk::DescriptorBufferInfo {
-                buffer: light_buffers[i].raw,
-                offset: 0,
-                range: light_size,
-            }]);
+            camera_infos.push([vk::DescriptorBufferInfo::default()
+                .buffer(camera_buffers[i].raw)
+                .offset(0)
+                .range(camera_size)]);
+
+            light_infos.push([vk::DescriptorBufferInfo::default()
+                .buffer(light_buffers[i].raw)
+                .offset(0)
+                .range(light_size)]);
         }
+
+        let shadow_map_info = [vk::DescriptorImageInfo::default()
+            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .image_view(shadow_map.view())
+            .sampler(shadow_map.sampler())];
 
         for i in 0..frames_in_flight {
             descriptor_writes.push(
@@ -115,12 +125,21 @@ impl GlobalDescriptorSet {
                     .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                     .buffer_info(&camera_infos[i]),
             );
+
             descriptor_writes.push(
                 vk::WriteDescriptorSet::default()
                     .dst_set(sets[i])
                     .dst_binding(1)
                     .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                     .buffer_info(&light_infos[i]),
+            );
+
+            descriptor_writes.push(
+                vk::WriteDescriptorSet::default()
+                    .dst_set(sets[i])
+                    .dst_binding(2)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&shadow_map_info),
             );
         }
 
@@ -146,9 +165,9 @@ impl GlobalDescriptorSet {
 
     pub fn flush(
         &mut self,
-        frame : usize,
+        frame: usize,
         camera: &CameraUbo,
-        light : &LightUbo,
+        light: &LightUbo,
     ) -> anyhow::Result<()> {
         self.camera_buffers[frame].write(std::slice::from_ref(camera))?;
         self.light_buffers[frame].write(std::slice::from_ref(light))?;
@@ -171,10 +190,10 @@ impl Drop for GlobalDescriptorSet {
 }
 
 pub struct MaterialAllocator {
-    ctx      : Arc<DeviceContext>,
-    layout   : vk::DescriptorSetLayout,
-    pool     : vk::DescriptorPool,
-    capacity : u32,
+    ctx: Arc<DeviceContext>,
+    layout: vk::DescriptorSetLayout,
+    pool: vk::DescriptorPool,
+    capacity: u32,
     allocated: u32,
 }
 
@@ -258,7 +277,6 @@ impl MaterialAllocator {
         self.allocated += 1;
 
         Ok(MaterialDescriptorSet {
-            //ctx: Arc::clone(&self.ctx),
             set: sets[0],
             buffer,
         })
@@ -287,9 +305,8 @@ impl Drop for MaterialAllocator {
 }
 
 pub struct MaterialDescriptorSet {
-    //ctx    : Arc<DeviceContext>,
     pub set: vk::DescriptorSet,
-    buffer : Buffer,
+    buffer: Buffer,
 }
 
 impl MaterialDescriptorSet {
@@ -300,6 +317,5 @@ impl MaterialDescriptorSet {
 }
 
 impl Drop for MaterialDescriptorSet {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }

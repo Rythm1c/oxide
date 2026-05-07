@@ -12,6 +12,6 @@ layout(push_constant) uniform PushConstants {
 
 void main() {
 
-    gl_position = pc.proj_view * pc.model * vec4(pos, 1.0);
+    gl_Position = pc.proj_view * pc.model * vec4(pos, 1.0);
 
 }

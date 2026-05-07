@@ -6,6 +6,7 @@ use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
 use engine_core::device::DeviceContext;
 
+use math::mat4x4;
 use math::quaternion::Quat;
 use math::vec3::Vec3;
 
@@ -106,12 +107,12 @@ impl Scene {
         let cpos = self.camera().position().to_array();
         let dir = self.light.direction;
         let col = self.light.color;
-        let amb = self.light.ambient;
+        let matrix = self.light.proj_view_matrix();
         LightUbo {
             camera_pos : [cpos[0], cpos[1], cpos[2], 0.0],
-            ambient    : [amb[0], amb[1], amb[2], 0.0],
             light_dir  : [dir[0], dir[1], dir[2], 0.0],
             light_color: [col[0], col[1], col[2], 1.0],
+            light_space: matrix
         }
     }
 
@@ -135,16 +136,26 @@ impl Scene {
 
 pub struct Light {
     pub color    : [f32; 3],
-    pub ambient  : [f32; 3],
     pub direction: [f32; 3],
 }
 
 impl Default for Light {
     fn default() -> Self {
         Light {
-            ambient  : [0.1; 3],
             color    : [10.0; 3],
             direction: [0.2, -1.0, -0.5],
         }
+    }
+}
+
+impl Light {
+    fn proj_view_matrix(&self) -> [[f32; 4]; 4] {
+        let proj = mat4x4::orthogonal(15.0, -15.0, 15.0, -15.0, 15.0, -15.0);
+        let direction = Vec3::from(&self.direction);
+        let view = mat4x4::look_at(direction, Vec3::ZERO, Vec3::Y);
+
+        let proj_view = proj * view;
+
+        mat4x4::transpose(&proj_view).data
     }
 }

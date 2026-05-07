@@ -4,7 +4,10 @@ use anyhow::Ok;
 use ash::vk;
 
 use super::pipeline::ShadowPipeline;
-use crate::{device::DeviceContext, texture::Texture};
+use crate::{
+    device::DeviceContext, drawable::RenderObject, pipeline::ShadowMapPushConstants,
+    texture::Texture,
+};
 
 pub struct ShadowMap {
     ctx: Arc<DeviceContext>,
@@ -48,6 +51,39 @@ impl ShadowMap {
                 .create_sampler(&create_info, None)
                 .unwrap_or_else(|_| panic!("failed to create shadow map sampler!"))
         }
+    }
+
+    pub fn pipeline(&self) -> vk::Pipeline {
+        self.shadow_pipeline.handle()
+    }
+
+    pub fn pipeline_layout(&self) -> vk::PipelineLayout {
+        self.shadow_pipeline.layout()
+    }
+
+    pub fn render_pass(&self) -> vk::RenderPass {
+        self.shadow_pipeline.render_pass()
+    }
+
+    pub fn framebuffer(&self) -> vk::Framebuffer {
+        self.shadow_pipeline.framebuffer()
+    }
+
+    pub fn sampler(&self) -> vk::Sampler {
+        self.sampler
+    }
+
+    pub fn view(&self) -> vk::ImageView {
+        self.map.view
+    }
+
+    pub fn render_shadow(
+        &self,
+        cmd: vk::CommandBuffer,
+        drawable: &RenderObject,
+        light_space_matrix: [[f32; 4]; 4],
+    ) {
+        let push_constants = ShadowMapPushConstants::new(drawable.model, light_space_matrix);
     }
 }
 

@@ -382,8 +382,7 @@ pub struct ShadowPipeline {
 impl ShadowPipeline {
     pub fn new(ctx: Arc<DeviceContext>, view: vk::ImageView, res: vk::Extent2D) -> anyhow::Result<Self> {
         let render_pass = Self::create_renderpass(Arc::clone(&ctx));
-        let framebuffer =
-            Self::create_framebuffer(Arc::clone(&ctx), view, render_pass, res.clone());
+        let framebuffer = Self::create_framebuffer(Arc::clone(&ctx), view, render_pass, res.clone());
         let layout = Self::create_pipeline_layout(Arc::clone(&ctx));
         let handle = Self::create_pipeline(Arc::clone(&ctx), layout, render_pass, res)?;
 
@@ -461,7 +460,8 @@ impl ShadowPipeline {
             .attachments(&attachments)
             .width(res.width)
             .height(res.height)
-            .render_pass(render_pass);
+            .render_pass(render_pass)
+            .layers(1);
 
         unsafe {
             ctx.device
@@ -580,6 +580,22 @@ impl ShadowPipeline {
                 )
                 .expect("Failed to create graphics pipeline")[0]
         })
+    }
+
+    pub fn handle(&self) -> vk::Pipeline {
+        self.handle
+    }
+
+    pub fn layout(&self) -> vk::PipelineLayout {
+        self.layout
+    }
+
+    pub fn render_pass(&self) -> vk::RenderPass {
+        self.render_pass
+    }
+
+    pub fn framebuffer(&self) -> vk::Framebuffer {
+        self.framebuffer
     }
 }
 

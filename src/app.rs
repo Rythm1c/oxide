@@ -7,7 +7,7 @@ use engine_core::{
         MaterialAllocator
         }, 
     pipeline::RenderPipeline, 
-    renderer::Renderer
+    renderer::Renderer, shadowmap::ShadowMap
 };
 
 use std::sync::Arc;
@@ -24,6 +24,7 @@ struct VulkanCore {
     pipeline          : RenderPipeline,
     globals           : GlobalDescriptorSet,
     material_allocator: MaterialAllocator,
+    shadow_map        : ShadowMap,
     context           : Arc<VkContext>,
 }
 
@@ -36,8 +37,11 @@ impl VulkanCore {
             window.inner_size().height,
         )?);
 
+        let shadow_map = ShadowMap::new(Arc::clone(&context.device_ctx), 2048u32, 2048u32)?;
+
         let globals = GlobalDescriptorSet::new(
             Arc::clone(&context.device_ctx),
+            &shadow_map,
             Renderer::MAX_FRAMES_IN_FLIGHT,
         )?;
 
@@ -56,6 +60,7 @@ impl VulkanCore {
             globals,
             material_allocator,
             context,
+            shadow_map,
             pipeline,
             renderer,
             

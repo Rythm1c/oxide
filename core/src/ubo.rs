@@ -1,3 +1,9 @@
+const ID : [[f32; 4]; 4] = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0]];
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct MaterialUbo{
@@ -32,21 +38,15 @@ impl Default for MaterialUbo {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct CameraUbo {
-    pub view    : [[f32; 4]; 4],
-    pub proj    : [[f32; 4]; 4],
+    pub view        : [[f32; 4]; 4],
+    pub proj        : [[f32; 4]; 4],
 }
 
 impl Default for CameraUbo {
     fn default() -> Self {
-        let id = [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ];
         Self {
-            view: id,
-            proj: id,
+            view : ID,
+            proj : ID,
         }
     }
 }
@@ -54,19 +54,20 @@ impl Default for CameraUbo {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct LightUbo {
-    pub camera_pos : [f32; 4],
-    pub ambient    : [f32; 4],
-    pub light_dir  : [f32; 4],
-    pub light_color: [f32; 4],
+    pub camera_pos  : [f32; 4],
+    pub light_dir   : [f32; 4],
+    pub light_color : [f32; 4],
+    pub light_space : [[f32; 4]; 4],
 }
 
 impl Default for LightUbo {
+
     fn default() -> Self {
         Self {
             camera_pos : [0.0; 4],
-            ambient    : [0.1; 4],
             light_dir  : [0.0, -1.0, 0.0, 0.0],
             light_color: [1.0; 4],
+            light_space: ID,
         }
     }
 }
