@@ -68,7 +68,7 @@ impl ShadowMapPushConstants {
         Self { proj_view, model }
     }
 
-    pub fn as_bytes(&self)-> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         unsafe {
             std::slice::from_raw_parts(
                 self as *const Self as *const u8,
@@ -355,6 +355,47 @@ impl RenderPipeline {
 
         Ok(self)
     }
+
+    pub fn begin_render_pass(
+        &self,
+        cmd: vk::CommandBuffer,
+        clear_color: [f32; 4],
+        present_index: usize,
+    ) {
+        let clear_values = [
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: clear_color,
+                },
+            },
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
+
+        let render_pass_begin_info = vk::RenderPassBeginInfo::default()
+            .render_pass(self.renderpass)
+            .framebuffer(self.framebuffers[present_index])
+            .render_area(self.ctx.surface_resolution().into())
+            .clear_values(&clear_values);
+
+        unsafe {
+            self.ctx.device().cmd_begin_render_pass(
+                cmd,
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
+
+            self.ctx
+                .device()
+                .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.handle);
+            self.ctx.device().cmd_set_viewport(cmd, 0, &self.viewports);
+            self.ctx.device().cmd_set_scissor(cmd, 0, &self.scissors);
+        }
+    }
 }
 
 impl Drop for RenderPipeline {
@@ -380,9 +421,14 @@ pub struct ShadowPipeline {
 }
 
 impl ShadowPipeline {
-    pub fn new(ctx: Arc<DeviceContext>, view: vk::ImageView, res: vk::Extent2D) -> anyhow::Result<Self> {
+    pub fn new(
+        ctx: Arc<DeviceContext>,
+        view: vk::ImageView,
+        res: vk::Extent2D,
+    ) -> anyhow::Result<Self> {
         let render_pass = Self::create_renderpass(Arc::clone(&ctx));
-        let framebuffer = Self::create_framebuffer(Arc::clone(&ctx), view, render_pass, res.clone());
+        let framebuffer =
+            Self::create_framebuffer(Arc::clone(&ctx), view, render_pass, res.clone());
         let layout = Self::create_pipeline_layout(Arc::clone(&ctx));
         let handle = Self::create_pipeline(Arc::clone(&ctx), layout, render_pass, res)?;
 
@@ -486,7 +532,7 @@ impl ShadowPipeline {
         ctx: Arc<DeviceContext>,
         layout: vk::PipelineLayout,
         render_pass: vk::RenderPass,
-        res: vk::Extent2D
+        res: vk::Extent2D,
     ) -> anyhow::Result<vk::Pipeline> {
         let vertex_shader = ShaderModule::load_from_file(Arc::clone(&ctx), "shaders/shadow.spv")?;
 
@@ -596,6 +642,43 @@ impl ShadowPipeline {
 
     pub fn framebuffer(&self) -> vk::Framebuffer {
         self.framebuffer
+    }
+
+    pub fn begin_render_pass(&self, cmd: vk::CommandBuffer, resolution: vk::Extent2D) {
+        let clear_values = [vk::ClearValue {
+            depth_stencil: vk::ClearDepthStencilValue {
+                depth: 1.0,
+                stencil: 0,
+            },
+        }];
+
+        let begin_info = vk::RenderPassBeginInfo::default()
+            .render_pass(self.render_pass())
+            .framebuffer(self.framebuffer())
+            .render_area(resolution.into())
+            .clear_values(&clear_values);
+
+        unsafe {
+            self.ctx
+                .device
+                .cmd_begin_render_pass(cmd, &begin_info, vk::SubpassContents::INLINE);
+
+            let viewports = [vk::Viewport::default()
+                .x(0.0)
+                .y(0.0)
+                .width(resolution.width as f32)
+                .height(resolution.height as f32)
+                .min_depth(0.0)
+                .max_depth(1.0)];
+            self.ctx.device.cmd_set_viewport(cmd, 0, &viewports);
+
+            let scissors = [vk::Rect2D::from(resolution)];
+            self.ctx.device.cmd_set_scissor(cmd, 0, &scissors);
+
+            self.ctx
+                .device
+                .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.handle);
+        }
     }
 }
 

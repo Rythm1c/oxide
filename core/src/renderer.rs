@@ -1,8 +1,9 @@
 use super::context::{VkContext, record_submit_commandbuffer_no_wait};
 use super::descriptor::GlobalDescriptorSet;
 use super::pipeline::RenderPipeline;
-use crate::drawable::RenderObject;
+use crate::drawable::{RenderObject, render_drawable};
 use crate::pipeline::PushConstants;
+use crate::shadowmap::ShadowMap;
 use ash::vk;
 use std::sync::Arc;
 
@@ -87,6 +88,8 @@ impl Renderer {
         &mut self,
         pipeline: &RenderPipeline,
         globals: &GlobalDescriptorSet,
+        shadow_map: &ShadowMap,
+        light_space_matrix: [[f32; 4]; 4],
         render_objects: &Vec<RenderObject>,
     ) -> anyhow::Result<()> {
         let ctx = &self.context;
@@ -119,26 +122,6 @@ impl Renderer {
         // until the corresponding present operation on that image has finished.
         let render_finished = self.render_finished_semaphores[present_index as usize];
 
-        let clear_values = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: self.clear_color,
-                },
-            },
-            vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            },
-        ];
-
-        let render_pass_begin_info = vk::RenderPassBeginInfo::default()
-            .render_pass(pipeline.renderpass)
-            .framebuffer(pipeline.framebuffers[present_index as usize])
-            .render_area(ctx.surface_resolution().into())
-            .clear_values(&clear_values);
-
         // record_submit_commandbuffer_no_wait:
         //   1. Skip wait/reset (we already did it above)
         //   2. begin / record / end
@@ -152,56 +135,55 @@ impl Renderer {
             &[image_available],
             &[render_finished],
             |device, cmd| unsafe {
-                device.cmd_begin_render_pass(
-                    cmd,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline.handle);
-                device.cmd_set_viewport(cmd, 0, &pipeline.viewports);
-                device.cmd_set_scissor(cmd, 0, &pipeline.scissors);
+                // render objects to the shadow map
+                {
+                    shadow_map.begin_render_pass(cmd);
 
-                device.cmd_bind_descriptor_sets(
-                    cmd,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    pipeline.layout,
-                    0,
-                    &[globals.set(frame)],
-                    &[],
-                );
-
-                for obj in render_objects.iter() {
-                    // Upload this object's MVP + model matrix as push constants.
-                    // This is the cheapest way to give each physics body its
-                    // own transform — no UBO allocation needed.
-                    device.cmd_push_constants(
-                        cmd,
-                        pipeline.layout,
-                        vk::ShaderStageFlags::VERTEX,
-                        0,
-                        PushConstants::from_model_matrix(obj.model_matrix).as_bytes(),
-                    );
+                    for obj in render_objects.iter() {
+                        shadow_map.render_shadow(cmd, obj, light_space_matrix);
+                    }
+                    // end render pipeline's render pass
+                    device.cmd_end_render_pass(cmd);
+                }
+                // render objects normally
+                {
+                    pipeline.begin_render_pass(cmd, self.clear_color, present_index as usize);
 
                     device.cmd_bind_descriptor_sets(
                         cmd,
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.layout,
-                        1,
-                        &[obj.material_desc.set],
+                        0,
+                        &[globals.set(frame)],
                         &[],
                     );
 
-                    device.cmd_bind_vertex_buffers(cmd, 0, &[obj.vertex_buffer.raw], &[0]);
+                    for obj in render_objects.iter() {
+                        // Upload this object's MVP + model matrix as push constants.
+                        // This is the cheapest way to give each physics body its
+                        // own transform — no UBO allocation needed.
+                        device.cmd_push_constants(
+                            cmd,
+                            pipeline.layout,
+                            vk::ShaderStageFlags::VERTEX,
+                            0,
+                            PushConstants::from_model_matrix(obj.model_matrix).as_bytes(),
+                        );
 
-                    if let Some(idxbuf) = &obj.index_buffer {
-                        device.cmd_bind_index_buffer(cmd, idxbuf.raw, 0, vk::IndexType::UINT32);
-                        device.cmd_draw_indexed(cmd, obj.index_count, 1, 0, 0, 0);
-                    } else {
-                        device.cmd_draw(cmd, obj.vertex_count, 1, 0, 0);
+                        device.cmd_bind_descriptor_sets(
+                            cmd,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            pipeline.layout,
+                            1,
+                            &[obj.material_desc.set],
+                            &[],
+                        );
+
+                        render_drawable(device, cmd, obj);
                     }
+                    // end render pipeline's render pass
+                    device.cmd_end_render_pass(cmd);
                 }
-
-                device.cmd_end_render_pass(cmd);
             },
         );
 

@@ -110,8 +110,8 @@ impl Scene {
         let matrix = self.light.proj_view_matrix();
         LightUbo {
             camera_pos : [cpos[0], cpos[1], cpos[2], 0.0],
-            light_dir  : [dir[0], dir[1], dir[2], 0.0],
-            light_color: [col[0], col[1], col[2], 1.0],
+            light_dir  : [ dir[0],  dir[1],  dir[2], 0.0],
+            light_color: [ col[0],  col[1],  col[2], 1.0],
             light_space: matrix
         }
     }
@@ -149,10 +149,12 @@ impl Default for Light {
 }
 
 impl Light {
-    fn proj_view_matrix(&self) -> [[f32; 4]; 4] {
-        let proj = mat4x4::orthogonal(15.0, -15.0, 15.0, -15.0, 15.0, -15.0);
+    pub fn proj_view_matrix(&self) -> [[f32; 4]; 4] {
+        let mut proj = mat4x4::orthogonal(15.0, -15.0, 15.0, -15.0, 15.0, -15.0);
+        proj.data[1][1] *= -1.0;
+
         let direction = Vec3::from(&self.direction);
-        let view = mat4x4::look_at(direction, Vec3::ZERO, Vec3::Y);
+        let view = mat4x4::look_at(direction.unit() * 15.0, Vec3::ZERO, Vec3::Y);
 
         let proj_view = proj * view;
 

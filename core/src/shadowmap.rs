@@ -5,7 +5,9 @@ use ash::vk;
 
 use super::pipeline::ShadowPipeline;
 use crate::{
-    device::DeviceContext, drawable::RenderObject, pipeline::ShadowMapPushConstants,
+    device::DeviceContext,
+    drawable::{RenderObject, render_drawable},
+    pipeline::ShadowMapPushConstants,
     texture::Texture,
 };
 
@@ -14,12 +16,13 @@ pub struct ShadowMap {
     shadow_pipeline: ShadowPipeline,
     map: Texture,
     sampler: vk::Sampler,
+    resolution: vk::Extent2D,
 }
 
 impl ShadowMap {
     pub fn new(ctx: Arc<DeviceContext>, width: u32, height: u32) -> anyhow::Result<Self> {
         let resolution = vk::Extent2D::default().width(width).height(height);
-        let map = Texture::create_depth(Arc::clone(&ctx), resolution, vk::Format::D32_SFLOAT)?;
+        let map = Texture::create_shadow_map(Arc::clone(&ctx), resolution, vk::Format::D32_SFLOAT)?;
         let sampler = Self::create_sampler(Arc::clone(&ctx));
         let shadow_pipeline = ShadowPipeline::new(Arc::clone(&ctx), map.view, resolution)?;
 
@@ -28,6 +31,7 @@ impl ShadowMap {
             shadow_pipeline,
             map,
             sampler,
+            resolution,
         })
     }
 
@@ -77,13 +81,33 @@ impl ShadowMap {
         self.map.view
     }
 
+    pub fn begin_render_pass(&self, cmd: vk::CommandBuffer) {
+        self.shadow_pipeline.begin_render_pass(cmd, self.resolution);
+    }
+
     pub fn render_shadow(
         &self,
         cmd: vk::CommandBuffer,
         drawable: &RenderObject,
         light_space_matrix: [[f32; 4]; 4],
     ) {
-        let push_constants = ShadowMapPushConstants::new(drawable.model, light_space_matrix);
+        let push_constants = ShadowMapPushConstants::new(drawable.model_matrix, light_space_matrix);
+
+        unsafe {
+            self.ctx.device.cmd_push_constants(
+                cmd,
+                self.pipeline_layout(),
+                vk::ShaderStageFlags::VERTEX,
+                0,
+                push_constants.as_bytes(),
+            );
+
+            render_drawable(&self.ctx.device, cmd, drawable);
+        }
+    }
+
+    pub fn end_renderpass(&self, cmd: vk::CommandBuffer) {
+        unsafe { self.ctx.device.cmd_end_render_pass(cmd) };
     }
 }
 

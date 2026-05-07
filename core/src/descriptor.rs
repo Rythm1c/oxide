@@ -54,9 +54,14 @@ impl GlobalDescriptorSet {
         };
 
         // We need `frames_in_flight` sets, each with 2 UBO descriptors.
-        let pool_sizes = [vk::DescriptorPoolSize::default()
-            .ty(vk::DescriptorType::UNIFORM_BUFFER)
-            .descriptor_count((2 * frames_in_flight) as u32)];
+        let pool_sizes = [
+            vk::DescriptorPoolSize::default()
+                .ty(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count((2 * frames_in_flight) as u32),
+            vk::DescriptorPoolSize::default()
+                .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(frames_in_flight as u32),
+        ];
 
         let pool = unsafe {
             device.create_descriptor_pool(
@@ -97,8 +102,10 @@ impl GlobalDescriptorSet {
         }
 
         let mut descriptor_writes = Vec::with_capacity(frames_in_flight * 3);
-        let mut camera_infos: Vec<[vk::DescriptorBufferInfo; 1]> = Vec::with_capacity(frames_in_flight);
-        let mut light_infos: Vec<[vk::DescriptorBufferInfo; 1]> = Vec::with_capacity(frames_in_flight);
+        let mut camera_infos: Vec<[vk::DescriptorBufferInfo; 1]> =
+            Vec::with_capacity(frames_in_flight);
+        let mut light_infos: Vec<[vk::DescriptorBufferInfo; 1]> =
+            Vec::with_capacity(frames_in_flight);
 
         for i in 0..frames_in_flight {
             camera_infos.push([vk::DescriptorBufferInfo::default()

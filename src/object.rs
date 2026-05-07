@@ -1,7 +1,6 @@
 use engine_core::buffer::{Buffer, BufferUsage};
 use engine_core::device::DeviceContext;
 use engine_core::drawable::RenderObject;
-use engine_core::pipeline::PushConstants;
 use engine_core::descriptor::{MaterialDescriptorSet, MaterialAllocator};
 
 use engine_core::ubo::MaterialUbo;
@@ -107,7 +106,7 @@ impl Object {
             index_buffer  : self.index_buffer.as_ref().map(Arc::clone),
             vertex_count  : self.geometry.vertex_count() as u32,
             index_count   : self.geometry.index_count() as u32,
-            push_constants: PushConstants { model },
+            model_matrix  : model,
             material_desc : Arc::clone(gpu_material)
         })
     }

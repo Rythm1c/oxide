@@ -165,7 +165,12 @@ impl ApplicationHandler for App {
 
                         match core
                             .renderer
-                            .render(&core.pipeline, &core.globals, &scene.render_objects())
+                            .render(
+                                &core.pipeline, 
+                                &core.globals, 
+                                &core.shadow_map, 
+                                scene.light.proj_view_matrix(),
+                                &scene.render_objects())
                         {
                             Ok(_) => {}
                             Err(e) => eprintln!("Render error: {e}"),

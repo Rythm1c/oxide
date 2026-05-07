@@ -16,7 +16,7 @@ layout(set = 0, binding = 1) uniform LightUBO {
     mat4 perpective;   // lights projection matrix
 } lightUBO;
 
-layout(set = 0, bindinf = 2) uniform sampler2D shadowMap;
+layout(set = 0, binding = 2) uniform sampler2DShadow shadowMap;
 
 // set = 1, binding = 0 — matches MaterialUbo Rust struct field order:
 //   roughness, metallic, ao, _pad0, useChecker, divisions, factor, _pad1
@@ -41,12 +41,7 @@ float shadow(vec4 fragPos) {
 
     if (projCoords.z > 1.0) return 1.0;
 
-    if(texture2D(shadowMap, projCoords.xy).z < projCoords.z) {
-        return 0.5;
-    }
-
-    return 1.0; 
-
+    return texture(shadowMap, projCoords);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +111,7 @@ void main() {
     //vec3 albedo = vec3(0.0, 1.0, 1.0) * check;
 
     vec3 N = normalize(o_normal);
-    vec3 V = normalize(lightUBO.cameraPos.xyz - fragWorldPos);
+    vec3 V = normalize(lightUBO.cameraPos.xyz - fragWorldPos.xyz);
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, material.metallic);

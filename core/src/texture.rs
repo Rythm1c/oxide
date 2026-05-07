@@ -16,6 +16,8 @@ pub enum TextureType {
     Storage,
     /// Sampled texture (read-only)
     Sampled,
+    /// Depth/stencil attachment and Sampled
+    ShadowMap
 }
 
 impl TextureType {
@@ -26,6 +28,7 @@ impl TextureType {
             TextureType::Color => vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
             TextureType::Storage => vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_DST,
             TextureType::Sampled => vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            TextureType::ShadowMap => vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED
         }
     }
 
@@ -36,6 +39,7 @@ impl TextureType {
             TextureType::Color => vk::ImageAspectFlags::COLOR,
             TextureType::Storage => vk::ImageAspectFlags::COLOR,
             TextureType::Sampled => vk::ImageAspectFlags::COLOR,
+            TextureType::ShadowMap => vk::ImageAspectFlags::DEPTH
         }
     }
 }
@@ -127,6 +131,14 @@ impl Texture {
         format: vk::Format,
     ) -> anyhow::Result<Self> {
         Self::new(ctx, TextureType::Depth, extent, format)
+    }
+
+    pub fn create_shadow_map(
+        ctx: Arc<DeviceContext>,
+        extent: vk::Extent2D,
+        format: vk::Format,
+    ) -> anyhow::Result<Self> {
+        Self::new(ctx, TextureType::ShadowMap, extent, format)
     }
 
     /// Create a color texture (convenience method)
