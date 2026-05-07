@@ -34,14 +34,28 @@ layout(set = 1, binding = 0) uniform MaterialUBO {
 
 const float PI = 3.14159265359;
 
-float shadow(vec4 fragPos) {
+float shadowPCF(vec4 fragPos) {
     vec3 projCoords = fragPos.xyz / fragPos.w;
     
     projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
     if (projCoords.z > 1.0) return 1.0;
 
-    return texture(shadowMap, projCoords);
+    float shadow   = 0.0;
+    vec2  texelSize = 1.0 / textureSize(shadowMap, 0);
+
+    // 3x3 PCF kernel -- 9 samples
+    for (int x = -1; x <= 1; ++x)
+    {
+        for (int y = -1; y <= 1; ++y)
+        {
+            vec2 offset    = vec2(x, y) * texelSize;
+
+            shadow += texture(shadowMap, vec3(projCoords.xy + offset, projCoords.z));
+        }
+    }
+
+    return shadow / 9.0; // average the 9 samples
 }
 
 // ---------------------------------------------------------------------------
@@ -143,10 +157,12 @@ void main() {
     kD *= 1.0 - material.metallic;	  
 
         // scale light by NdotL
-    float NdotL = max(dot(N, L), 0.0);        
+    float NdotL = max(dot(N, L), 0.0);      
+
+    float shadow =  shadowPCF(lightUBO.perpective * fragWorldPos);
 
         // add to outgoing radiance Lo
-    Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadow(lightUBO.perpective * fragWorldPos);  
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL * max(shadow, 0.1);  
 
     // ambient lighting 
     vec3 ambient = vec3(0.03) * albedo * material.ao;

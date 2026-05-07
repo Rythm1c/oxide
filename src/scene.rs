@@ -150,11 +150,14 @@ impl Default for Light {
 
 impl Light {
     pub fn proj_view_matrix(&self) -> [[f32; 4]; 4] {
-        let mut proj = mat4x4::orthogonal(15.0, -15.0, 15.0, -15.0, 15.0, -15.0);
-        proj.data[1][1] *= -1.0;
 
         let direction = Vec3::from(&self.direction);
-        let view = mat4x4::look_at(direction.unit() * 15.0, Vec3::ZERO, Vec3::Y);
+        let light_pos = Vec3::ZERO - direction.unit() * 15.0;
+
+        let view = mat4x4::look_at(light_pos, Vec3::ZERO, Vec3::Y);
+
+        let mut proj = mat4x4::orthogonal(30.0, -30.0, 30.0, -30.0, -30.0, 30.0);
+        proj.data[1][1] *= -1.0;
 
         let proj_view = proj * view;
 
