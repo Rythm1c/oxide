@@ -35,7 +35,7 @@ you should see a sample scene
 - [x] directional lighting
 - [x] Physical based rendering
 - [ ] Multiple point lights
-- [ ] shadow-map
+- [x] shadow-map(PCF)
 - [ ] GUI
 - [ ] sky box
 - [ ] transparency
