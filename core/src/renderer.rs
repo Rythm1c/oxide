@@ -1,9 +1,11 @@
 use super::context::{VkContext, record_submit_commandbuffer_no_wait};
 use super::descriptor::GlobalDescriptorSet;
 use super::pipeline::RenderPipeline;
+
 use crate::drawable::{RenderObject, render_drawable};
 use crate::pipeline::PushConstants;
 use crate::shadowmap::ShadowMap;
+
 use ash::vk;
 use std::sync::Arc;
 
@@ -145,6 +147,7 @@ impl Renderer {
                     // end render pipeline's render pass
                     device.cmd_end_render_pass(cmd);
                 }
+
                 // render objects normally
                 {
                     pipeline.begin_render_pass(cmd, self.clear_color, present_index as usize);
