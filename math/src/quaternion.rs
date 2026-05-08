@@ -14,10 +14,6 @@ pub struct Quat {
     pub s: f32,
 }
 
-pub fn quat(x: f32, y: f32, z: f32, s: f32) -> Quat {
-    Quat { x, y, z, s }
-}
-
 impl Quat {
     pub const ZERO: Self = Self {
         x: 0.0,
@@ -31,7 +27,7 @@ impl Quat {
     }
     /// get quaternion from array
     pub fn from(a: &[f32; 4]) -> Self {
-        quat(a[0], a[1], a[2], a[3])
+        Self::new(a[0], a[1], a[2], a[3])
     }
     pub fn to_array(&self) -> [f32; 4] {
         [self.x, self.y, self.z, self.s]
