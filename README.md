@@ -4,6 +4,8 @@ A 3D renderer that uses the vulkan api
 Nothing too fancy. Just a hobby project i've been working on in my spare time for my love of computer graphics.
 I used rust to learn more about the language(i also like abit of pain).
 
+end goal is to have a decent physics engine.
+
 dependencies are in the .toml file.
 
 ## Project set up
@@ -37,9 +39,11 @@ you should see a sample scene
 - [ ] Multiple point lights
 - [x] shadow-map(PCF)
 - [ ] GUI
+- [ ] screen capture
 - [ ] sky box
 - [ ] transparency
 - [ ] physics
+- [ ] 3D model support
 - [ ] animations
 
 
