@@ -4,6 +4,8 @@
 //----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------
 
+use crate::mat3x3::Mat3x3;
+
 use super::{mat4x4::*, vec3::Vec3};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -107,9 +109,8 @@ impl Quat {
         Vec3::new(self.x, self.y, self.z)
     }
 
-    /// rotate around a specified axis
     /// creates a rotation matrix from a quaternion
-    pub fn to_mat4x4(&self) -> Mat4x4 {
+    pub fn to_mat3x3(&self) -> Mat3x3 {
         let x2 = f32::powf(self.x, 2.0);
         let y2 = f32::powf(self.y, 2.0);
         let z2 = f32::powf(self.z, 2.0);
@@ -126,12 +127,26 @@ impl Quat {
         let zy = 2.0 * (self.y * self.z + self.s * self.x);
         let zz = 1.0 - 2.0 * (x2 + y2);
 
+        Mat3x3 {
+            data: [
+                [ xx,  xy,  xz],
+                [ yx,  yy,  yz],
+                [ zx,  zy,  zz],
+            ],
+        }
+    }
+
+    /// rotate around a specified axis
+    /// creates a rotation matrix from a quaternion
+    pub fn to_mat4x4(&self) -> Mat4x4 {
+        let d = self.to_mat3x3().data;
+
         Mat4x4 {
             data: [
-                [ xx,  xy,  xz, 0.0],
-                [ yx,  yy,  yz, 0.0],
-                [ zx,  zy,  zz, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
+                [d[0][0], d[0][1], d[0][2], 0.0],
+                [d[1][0], d[1][1], d[1][2], 0.0],
+                [d[2][0], d[2][1], d[2][2], 0.0],
+                [0.0,       0.0,      0.0,       1.0],
             ],
         }
     }
