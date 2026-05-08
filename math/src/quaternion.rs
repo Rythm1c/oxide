@@ -4,7 +4,7 @@
 // "john vince - quaternions for for computer graphics" was a massive help along with
 // "gabor szauer - hands on c++ game animation programming packt", both great books.
 
-use super::{mat4x4::*, vec3::*};
+use super::{mat4x4::*, vec3::Vec3};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Quat {
@@ -36,14 +36,14 @@ impl Quat {
     pub fn to_array(&self) -> [f32; 4] {
         [self.x, self.y, self.z, self.s]
     }
-    /// halves the angle and creates a quaternion from it and the specified axis  
-    /// and also axis is normalized so no worries  
+    /// halves the angle and creates a quaternion from it and the specified axis
+    /// and also axis is normalized so no worries
     /// resulting quaternion intended to be used with 'to_mat' function
     pub fn create(angle: f32, axis: Vec3) -> Self {
-        let s = f32::sin(radians(angle / 2.0));
-        let c = f32::cos(radians(angle / 2.0));
+        let s = f32::sin((angle / 2.0).to_radians());
+        let c = f32::cos((angle / 2.0).to_radians());
 
-        let unit_axis = Vec3::unit(&axis);
+        let unit_axis = Vec3::normalize(&axis);
 
         let x = s * unit_axis.x;
         let y = s * unit_axis.y;
@@ -108,12 +108,12 @@ impl Quat {
     }
 
     pub fn axis(&self) -> Vec3 {
-        vec3(self.x, self.y, self.z)
+        Vec3::new(self.x, self.y, self.z)
     }
 
     /// rotate around a specified axis
     /// creates a rotation matrix from a quaternion
-    pub fn to_mat(&self) -> Mat4x4 {
+    pub fn to_mat4x4(&self) -> Mat4x4 {
         let x2 = f32::powf(self.x, 2.0);
         let y2 = f32::powf(self.y, 2.0);
         let z2 = f32::powf(self.z, 2.0);
@@ -143,7 +143,6 @@ impl Quat {
 
 use std::ops::*;
 
-use super::misc::radians;
 impl Sub for Quat {
     type Output = Quat;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -203,12 +202,12 @@ impl Mul<Quat> for f32 {
 }
 impl Mul<Vec3> for Quat {
     type Output = Vec3;
-    /// same as  
+    /// same as
     /// r = (q * v' * q^-1).xyz
     fn mul(self, rhs: Vec3) -> Self::Output {
-        let a = self.axis() * 2.0 * dot(&self.axis(), &rhs);
-        let b = rhs * (self.s * self.s - dot(&self.axis(), &self.axis()));
-        let c = cross(self.axis(), rhs) * 2.0 * self.s;
+        let a = self.axis() * 2.0 * Vec3::dot(&self.axis(), &rhs);
+        let b = rhs * (self.s * self.s - Vec3::dot(&self.axis(), &self.axis()));
+        let c = Vec3::cross(&self.axis(), &rhs) * 2.0 * self.s;
 
         a + b + c
     }

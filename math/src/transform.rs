@@ -1,4 +1,4 @@
-use super::{mat4x4::*, quaternion::*, vec3::*};
+use super::{mat4x4::*, quaternion::*, vec3::Vec3};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Transform {
@@ -9,17 +9,15 @@ pub struct Transform {
 
 impl Default for Transform {
     fn default() -> Self {
-        Self::DEFAULT
+        Self {
+            translation: Vec3::ZERO,
+            orientation: Quat::ZERO,
+            scaling    : Vec3::ONE,
+        }
     }
 }
 
 impl Transform {
-    pub const DEFAULT: Self = Self {
-        translation: Vec3::ZERO,
-        orientation: Quat::ZERO,
-        scaling    : Vec3::ONE,
-    };
-
     pub fn new(scaling: Vec3, translation: Vec3, orientation: Quat) -> Self {
         Self {
             translation,
@@ -37,7 +35,7 @@ impl Transform {
     }
 
     pub fn from_mat(mat: &Mat4x4) -> Self {
-        let mut transform = Self::DEFAULT;
+        let mut transform = Self::default();
 
         let translation = Vec3 {
             x: mat.data[0][3],
@@ -55,10 +53,10 @@ impl Transform {
                 [0.0, 0.0, 0.0, 1.0],
             ],
         };
-        let inv_rot_mat = orientation.inverse().to_mat();
+        let inv_rot_mat = orientation.inverse().to_mat4x4();
         let scale_skew_mat = rot_scale_mat * inv_rot_mat;
 
-        let scaling = vec3(
+        let scaling = Vec3::new(
             scale_skew_mat.data[0][0],
             scale_skew_mat.data[1][1],
             scale_skew_mat.data[2][2],
@@ -72,9 +70,9 @@ impl Transform {
     }
 
     pub fn to_mat(&self) -> Mat4x4 {
-        let mut x = self.orientation * vec3(1.0, 0.0, 0.0);
-        let mut y = self.orientation * vec3(0.0, 1.0, 0.0);
-        let mut z = self.orientation * vec3(0.0, 0.0, 1.0);
+        let mut x = self.orientation * Vec3::X;
+        let mut y = self.orientation * Vec3::Y;
+        let mut z = self.orientation * Vec3::Z;
 
         x = x * self.scaling.x;
         y = y * self.scaling.y;
@@ -93,7 +91,7 @@ impl Transform {
     }
 
     pub fn inverse(&self) -> Self {
-        let mut inv = Transform::DEFAULT;
+        let mut inv = Transform::default();
 
         inv.orientation = self.orientation.inverse();
 
@@ -108,7 +106,7 @@ impl Transform {
     }
 
     pub fn combine(&self, rhs: &Self) -> Self {
-        let mut out = Transform::DEFAULT;
+        let mut out = Transform::default();
 
         out.scaling     = self.scaling * rhs.scaling;
 

@@ -3,27 +3,11 @@
 // and https://songho.ca/opengl/ was also pretty helpfull
 
 #![allow(dead_code)]
-use super::{quaternion::Quat, vec3::{Vec3, cross}};
+use super::{quaternion::Quat, vec3::Vec3};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Mat4x4 {
     pub data: [[f32; 4]; 4],
-}
-
-pub fn mat4x4(
-    xx: f32, xy: f32, xz: f32, xw: f32,
-    yx: f32, yy: f32, yz: f32, yw: f32,
-    zx: f32, zy: f32, zz: f32, zw: f32,
-    wx: f32, wy: f32, wz: f32, ww: f32,
-) -> Mat4x4 {
-    Mat4x4 {
-        data: [
-            [xx, xy, xz, xw],
-            [yx, yy, yz, yw],
-            [zx, zy, zz, zw],
-            [wx, wy, wz, ww],
-        ],
-    }
 }
 
 impl Mat4x4 {
@@ -35,6 +19,22 @@ impl Mat4x4 {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ]
+        }
+    }
+
+    pub fn new(
+        xx: f32, xy: f32, xz: f32, xw: f32,
+        yx: f32, yy: f32, yz: f32, yw: f32,
+        zx: f32, zy: f32, zz: f32, zw: f32,
+        wx: f32, wy: f32, wz: f32, ww: f32,
+    ) -> Self {
+        Self {
+            data: [
+                [xx, xy, xz, xw],
+                [yx, yy, yz, yw],
+                [zx, zy, zz, zw],
+                [wx, wy, wz, ww],
+            ],
         }
     }
 
@@ -241,11 +241,11 @@ impl Mat4x4 {
     /// for camera rotation
     pub fn look_at(eye: Vec3, front: Vec3, up: Vec3) -> Self {
         // camera direction
-        let cd = (eye - front).unit();
+        let cd = (eye - front).normalize();
         // get right vector
-        let cr = cross(up, cd).unit();
+        let cr = up.cross(&cd).normalize();
         // get up vector
-        let cu = cross(cd, cr).unit();
+        let cu = cd.cross(&cr).normalize();
 
         // translation vector
         let xw = -(eye.x * cr.x) - (eye.y * cr.y) - (eye.z * cr.z);

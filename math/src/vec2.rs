@@ -1,4 +1,3 @@
-use super::misc;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec2 {
@@ -17,9 +16,5 @@ impl Vec2 {
 
     pub fn from(a: &[f32; 2]) -> Self {
         Self { x: a[0], y: a[1] }
-    }
-
-    pub fn step(&self, other: &Self) -> [i32; 2] {
-        [misc::step(self.x, other.x), misc::step(self.y, other.y)]
     }
 }

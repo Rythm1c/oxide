@@ -1,5 +1,3 @@
-use super::misc::*;
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec3 {
     pub x: f32,
@@ -58,7 +56,7 @@ impl Vec3 {
     }
 
     // get the normalized vector
-    pub fn unit(&self) -> Self {
+    pub fn normalize(&self) -> Self {
         let inverse_legth = 1.0 / self.len();
         Self {
             x: self.x * inverse_legth,
@@ -86,35 +84,33 @@ impl Vec3 {
             z: self.z.min(other.z),
         }
     }
+
+    // dot product with another vector
+    pub fn dot(&self, rhs: &Vec3) -> f32 {
+        (self.x * rhs.x) + (self.y * rhs.y) + (self.z * rhs.z)
+    }
+    // reflect a vector around a normal
+    pub fn reflect(&self, normal: &Vec3) -> Vec3 {
+        *self - 2.0 * self.dot(normal) * *normal
+    }
+    //get the cross product between two vectors
+    pub fn cross(&self, rhs: &Vec3) -> Vec3 {
+        Vec3::new(
+            self.y * rhs.z - self.z * rhs.y,
+            self.z * rhs.x - self.x * rhs.z,
+            self.x * rhs.y - self.y * rhs.x,
+        )
+    }
+
+    pub fn clamp(&self, min: &Vec3, max: &Vec3) -> Vec3 {
+        Vec3::new(
+            self.x.clamp(min.x, max.x),
+            self.y.clamp(min.y, max.y),
+            self.z.clamp(min.z, max.z),
+        )
+    }
 }
 
-pub fn vec3(x: f32, y: f32, z: f32) -> Vec3 {
-    Vec3::new(x, y, z)
-}
-// dot product with another vector
-pub fn dot(v1: &Vec3, v2: &Vec3) -> f32 {
-    (v1.x * v2.x) + (v1.y * v2.y) + (v1.z * v2.z)
-}
-// reflect a vector around a normal
-pub fn reflect(incident: &Vec3, normal: &Vec3) -> Vec3 {
-    *incident - 2.0 * dot(incident, normal) * *normal
-}
-//get the cross product between two vectors
-pub fn cross(v1: Vec3, v2: Vec3) -> Vec3 {
-    Vec3::new(
-        v1.y * v2.z - v1.z * v2.y,
-        v1.z * v2.x - v1.x * v2.z,
-        v1.x * v2.y - v1.y * v2.x,
-    )
-}
-
-pub fn clamp_vec3(v: &Vec3, min: &Vec3, max: &Vec3) -> Vec3 {
-    Vec3::new(
-        clamp(v.x, min.x, max.x),
-        clamp(v.y, min.y, max.y),
-        clamp(v.z, min.z, max.z),
-    )
-}
 use std::ops::*;
 impl Add for Vec3 {
     type Output = Vec3;

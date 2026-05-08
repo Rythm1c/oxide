@@ -7,7 +7,6 @@
 
 pub mod mat3x3;
 pub mod mat4x4;
-pub mod misc;
 pub mod quaternion;
 pub mod transform;
 pub mod vec2;
@@ -19,7 +18,12 @@ mod tests {
     use vec3::*;
 
     #[test]
-    fn it_works() {
+    fn vec3_addition() {
         assert_eq!(vec3(5.0, 10.0, 11.0), vec3(2.0, 3.0, 15.0) + vec3(3.0, 7.0, -4.0));
     }
+
+    /* #[test]
+    fn mat4x4_mutiplication() {
+        //assert_eq!(vec3(5.0, 10.0, 11.0), vec3(2.0, 3.0, 15.0) + vec3(3.0, 7.0, -4.0));
+    } */
 }
