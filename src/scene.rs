@@ -6,7 +6,7 @@ use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
 use engine_core::device::DeviceContext;
 
-use math::mat4x4;
+use math::mat4x4::Mat4x4;
 use math::quaternion::Quat;
 use math::vec3::Vec3;
 
@@ -77,7 +77,7 @@ impl Scene {
             winit::keyboard::KeyCode::Space => {
                 cam.set_motion_up();
             }
-            winit::keyboard::KeyCode::ControlLeft | 
+            winit::keyboard::KeyCode::ControlLeft |
             winit::keyboard::KeyCode::ControlRight => {
                 cam.set_motion_down();
             }
@@ -119,9 +119,9 @@ impl Scene {
     /// Uploads all scene objects to GPU in batch.
     /// Call this once after adding all objects, typically right before rendering.
     pub fn upload_all_objects(
-        &self, 
-        device_ctx: Arc<DeviceContext>, 
-        material_allocator: &mut MaterialAllocator) 
+        &self,
+        device_ctx: Arc<DeviceContext>,
+        material_allocator: &mut MaterialAllocator)
         -> anyhow::Result<()> {
         let mut objects = self.objects.lock().unwrap();
         for obj in objects.iter_mut() {
@@ -152,15 +152,15 @@ impl Light {
     pub fn proj_view_matrix(&self) -> [[f32; 4]; 4] {
 
         let direction = Vec3::from(&self.direction);
-        let light_pos = Vec3::ZERO - direction.unit() * 15.0;
+        let light_pos = Vec3::ZERO - direction.normalize() * 15.0;
 
-        let view = mat4x4::look_at(light_pos, Vec3::ZERO, Vec3::Y);
+        let view = Mat4x4::look_at(light_pos, Vec3::ZERO, Vec3::Y);
 
-        let mut proj = mat4x4::orthogonal(30.0, -30.0, 30.0, -30.0, -30.0, 30.0);
+        let mut proj = Mat4x4::orthogonal(30.0, -30.0, 30.0, -30.0, -30.0, 30.0);
         proj.data[1][1] *= -1.0;
 
         let proj_view = proj * view;
 
-        mat4x4::transpose(&proj_view).data
+        proj_view.transpose().data
     }
 }

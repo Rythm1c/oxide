@@ -1,6 +1,5 @@
 use math::{
-    mat4x4,
-    vec3::{Vec3, cross, vec3},
+    mat4x4::Mat4x4, vec3::Vec3
 };
 
 use engine_core::ubo::CameraUbo;
@@ -44,7 +43,7 @@ pub struct Camera {
 impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
         let mut camera = Self {
-            pos        : vec3(0.0, 1.0, 9.0),
+            pos        : Vec3::new(0.0, 1.0, 9.0),
             front      : -Vec3::Z,
             right      :  Vec3::X,
             pitch      : 0.0,
@@ -122,11 +121,11 @@ impl Camera {
         self.front.y = pitch.sin();
         self.front.z = yaw.sin() * pitch.cos();
 
-        self.front = self.front.unit();
+        self.front = self.front.normalize();
 
-        self.right = cross(self.front, Vec3::Y).unit();
+        self.right = Vec3::cross(&self.front, &Vec3::Y).normalize();
 
-        self.up = cross(self.right, self.front).unit();
+        self.up = Vec3::cross(&self.right, &self.front).normalize();
 
     }
 
@@ -162,12 +161,12 @@ impl Camera {
     }
 
     pub fn get_ubo(&self) -> CameraUbo {
-        let mut view = mat4x4::look_at(self.pos, self.pos + self.front, self.up);
-        view = mat4x4::transpose(&view); // Transpose for column-major order
+        let mut view = Mat4x4::look_at(self.pos, self.pos + self.front, self.up);
+        view = Mat4x4::transpose(&view); // Transpose for column-major order
 
-        let mut proj = mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
+        let mut proj = Mat4x4::perspective(self.fov, self.aspect_ratio, self.near, self.far);
         proj.data[1][1] *= -1.0; // Flip Y for Vulkan's coordinate system
-        proj = mat4x4::transpose(&proj); // Transpose for column-major order
+        proj = Mat4x4::transpose(&proj); // Transpose for column-major order
 
 
         CameraUbo {

@@ -6,7 +6,6 @@ use engine_core::descriptor::{MaterialDescriptorSet, MaterialAllocator};
 use engine_core::ubo::MaterialUbo;
 use geometry::{Geometry, Shape};
 
-use math::mat4x4;
 use math::transform::Transform;
 
 use std::sync::Arc;
@@ -27,7 +26,7 @@ impl Object {
     /// Creates a new Object from a Shape without GPU buffers.
     /// Call `upload_to_gpu()` to transfer data to the GPU.
     pub fn new(shape: Shape, mat: Material) -> Self {
-        
+
         Self {
             geometry     : Geometry::new(shape),
             transform    : Transform::default(),
@@ -57,8 +56,8 @@ impl Object {
     }
 
     pub fn upload_material_to_gpu(
-        &mut self, 
-        material_allocator: &mut MaterialAllocator) 
+        &mut self,
+        material_allocator: &mut MaterialAllocator)
         -> anyhow::Result<()> {
         self.gpu_material = Some(Arc::new(
             material_allocator
@@ -99,7 +98,7 @@ impl Object {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("material not uploaded to GPU. Call upload_material_to_gpu() first"))?;
 
-        let model = mat4x4::transpose(&self.transform.to_mat()).data;
+        let model = self.transform.to_mat().transpose().data;
 
         Ok(RenderObject {
             vertex_buffer : Arc::clone(vertex_buffer),
@@ -124,12 +123,12 @@ pub struct Material {
 }
 impl Default for Material {
     fn default() -> Self {
-        Material { 
-            metallic   : 0.5, 
-            roughness  : 0.5, 
-            ao         : 0.5, 
-            use_checker: false, 
-            divisions  : 0.0, 
+        Material {
+            metallic   : 0.5,
+            roughness  : 0.5,
+            ao         : 0.5,
+            use_checker: false,
+            divisions  : 0.0,
             factor     : 1.0 }
     }
 }
