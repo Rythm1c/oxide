@@ -47,8 +47,8 @@ you should see a sample scene
 sample render on linux
 ![Alt text](./images/sample_1.png "Hello Triangle")
 
-sample render on windows
-![Alt text](./images/sample_2.png "eclipse")
-
 sample PBR render(widows)
-![Alt text](./images/sample_3.png "pbr sample")
+![Alt text](./images/sample_2.png "pbr sample")
+
+sample with shadow map
+![Alt text](./images/sample_3.png "shadow map sample")
