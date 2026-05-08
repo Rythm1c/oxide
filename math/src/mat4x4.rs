@@ -3,6 +3,8 @@
 // and https://songho.ca/opengl/ was also pretty helpfull
 
 #![allow(dead_code)]
+use crate::mat3x3::Mat3x3;
+
 use super::{quaternion::Quat, vec3::Vec3};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -55,39 +57,13 @@ impl Mat4x4 {
     /// changes signs past 180 degrees
     /// not sure why though
     pub fn to_quat(&self) -> Quat {
-        let data = &self.data;
+        let d = &self.data;
 
-        let s = 0.5 * (1.0 + data[0][0] + data[1][1] + data[2][2]).sqrt();
-        if s > 0.0 {
-            let coeff = 1.0 / (4.0 * s);
-            let x = coeff * (data[2][1] - data[1][2]);
-            let y = coeff * (data[0][2] - data[2][0]);
-            let z = coeff * (data[1][0] - data[0][1]);
-            return Quat { x, y, z, s };
-        }
-        let x = 0.5 * (1.0 + data[0][0] - data[1][1] - data[2][2]).sqrt();
-        if x > 0.0 {
-            let coeff = 1.0 / (4.0 * x);
-            let y = coeff * (data[0][1] + data[1][0]);
-            let z = coeff * (data[0][2] + data[2][0]);
-            let s = coeff * (data[2][1] - data[1][2]);
-            return Quat { x, y, z, s };
-        }
-        let y = 0.5 * (1.0 - data[0][0] + data[1][1] - data[2][2]).sqrt();
-        if y > 0.0 {
-            let coeff = 1.0 / (4.0 * y);
-            let x = coeff * (data[0][1] + data[1][0]);
-            let z = coeff * (data[1][2] + data[2][1]);
-            let s = coeff * (data[0][2] - data[2][0]);
-            return Quat { x, y, z, s };
-        }
-        // if all else fails just use z
-        let z = 0.5 * (1.0 - data[0][0] - data[1][1] + data[2][2]).sqrt();
-        let coeff = 1.0 / (4.0 * z);
-        let x = coeff * (data[0][2] + data[2][0]);
-        let y = coeff * (data[1][2] + data[2][1]);
-        let s = coeff * (data[1][0] - data[0][1]);
-        return Quat { x, y, z, s };
+        Mat3x3::new(
+            d[0][0], d[0][1], d[0][2],
+            d[1][0], d[1][1], d[1][2],
+            d[2][0], d[2][1], d[2][2],)
+        .to_quat()
     }
 
     pub fn transpose(&self) -> Mat4x4 {
@@ -103,49 +79,57 @@ impl Mat4x4 {
         }
     }
 
-    pub fn minor3x3(
-        &self,
-        c0: usize, c1: usize, c2: usize,
-        r0: usize, r1: usize, r2: usize,
-    ) -> f32 {
-        let x = &self.data;
+    pub fn minor(&self, r : u32, c : u32) -> f32 {
+        let d = &self.data;
+        let mut arr :Vec<f32> = Vec::with_capacity(9);
 
-        let a = x[r0][c0] * (x[r1][c1] * x[r2][c2] - x[r2][c1] * x[r1][c2]);
-        let b = x[r0][c1] * (x[r1][c0] * x[r2][c2] - x[r2][c0] * x[r1][c2]);
-        let c = x[r0][c2] * (x[r1][c0] * x[r2][c1] - x[r2][c0] * x[r1][c1]);
+        for i in 0..4 {
+            if i == r {
+                continue;
+            }
 
-        a - b + c
+            for j in 0..4{
+                if j == c {
+                    continue;
+                }
+
+                arr.push(d[i as usize][j as usize]);
+            }
+        }
+
+        Mat3x3::new(
+            arr[0], arr[1], arr[2],
+            arr[3], arr[4], arr[5],
+            arr[6], arr[7], arr[8])
+        .determinant()
+    }
+
+    pub fn cofactor(&self, r : u32, c : u32) -> f32 {
+        // +1 because we start with index 0
+        let power: u32 = r + 1 + c + 1;
+        let sign = (-1i32).pow(power) as f32;
+
+        sign * self.minor(r, c)
     }
 
     pub fn determinant(&self) -> f32 {
-        let a = self.data[0][0] * self.minor3x3(1, 2, 3, 1, 2, 3);
-        let b = self.data[0][1] * self.minor3x3(0, 2, 3, 1, 2, 3);
-        let c = self.data[0][2] * self.minor3x3(0, 1, 3, 1, 2, 3);
-        let d = self.data[0][3] * self.minor3x3(0, 1, 2, 1, 2, 3);
+        let a = self.data[0][0] * self.cofactor(0, 0);
+        let b = self.data[0][1] * self.cofactor(0, 1);
+        let c = self.data[0][2] * self.cofactor(0, 2);
+        let d = self.data[0][3] * self.cofactor(0, 3);
 
-        a - b + c - d
+        a + b + c + d
     }
 
     pub fn adjugate(&self) -> Self {
         //Cof (M[i, j]) = Minor(M[i, j]]) * pow(-1, i + j)
         //let m = &self.data;
         let mut cofactor = Self::identity();
-        cofactor.data[0][0] =  self.minor3x3(1, 2, 3, 1, 2, 3);
-        cofactor.data[1][0] = -self.minor3x3(1, 2, 3, 0, 2, 3);
-        cofactor.data[2][0] =  self.minor3x3(1, 2, 3, 0, 1, 3);
-        cofactor.data[3][0] = -self.minor3x3(1, 2, 3, 0, 1, 2);
-        cofactor.data[0][1] = -self.minor3x3(0, 2, 3, 1, 2, 3);
-        cofactor.data[1][1] =  self.minor3x3(0, 2, 3, 0, 2, 3);
-        cofactor.data[2][1] = -self.minor3x3(0, 2, 3, 0, 1, 3);
-        cofactor.data[3][1] =  self.minor3x3(0, 2, 3, 0, 1, 2);
-        cofactor.data[0][2] =  self.minor3x3(0, 1, 3, 1, 2, 3);
-        cofactor.data[1][2] = -self.minor3x3(0, 1, 3, 0, 2, 3);
-        cofactor.data[2][2] =  self.minor3x3(0, 1, 3, 0, 1, 3);
-        cofactor.data[3][2] = -self.minor3x3(0, 1, 3, 0, 1, 2);
-        cofactor.data[0][3] = -self.minor3x3(0, 1, 2, 1, 2, 3);
-        cofactor.data[1][3] =  self.minor3x3(0, 1, 2, 0, 2, 3);
-        cofactor.data[2][3] = -self.minor3x3(0, 1, 2, 0, 1, 3);
-        cofactor.data[3][3] =  self.minor3x3(0, 1, 2, 0, 1, 2);
+        for i in 0..4 {
+            for j in 0..4{
+                cofactor.data[i][j] = self.cofactor(i as u32, j as u32);
+            }
+        }
 
         cofactor.transpose()
     }
@@ -317,51 +301,39 @@ use std::ops::*;
 impl Mul<Mat4x4> for f32 {
     type Output = Mat4x4;
     fn mul(self, rhs: Mat4x4) -> Self::Output {
-        Mat4x4 {
-            data: [
-                [
-                    rhs.data[0][0] * self,
-                    rhs.data[0][1] * self,
-                    rhs.data[0][2] * self,
-                    rhs.data[0][3] * self,
-                ],
-                [
-                    rhs.data[1][0] * self,
-                    rhs.data[1][1] * self,
-                    rhs.data[1][2] * self,
-                    rhs.data[1][3] * self,
-                ],
-                [
-                    rhs.data[2][0] * self,
-                    rhs.data[2][1] * self,
-                    rhs.data[2][2] * self,
-                    rhs.data[2][3] * self,
-                ],
-                [
-                    rhs.data[3][0] * self,
-                    rhs.data[3][1] * self,
-                    rhs.data[3][2] * self,
-                    rhs.data[3][3] * self,
-                ],
-            ],
+        let mut output = Mat4x4::identity();
+
+        for i in 0..4 {
+            for j in 0..4 {
+                output.data[i][j] = self * rhs.data[i][j];
+            }
         }
+
+        output
     }
 }
 
-/// matrix multiplication helper.
-/// multiply corresponding row and column elements
-fn rxc(r: usize, c: usize, m1: &Mat4x4, m2: &Mat4x4) -> f32 {
-    let v1 = m1.data[r][0] * m2.data[0][c];
-    let v2 = m1.data[r][1] * m2.data[1][c];
-    let v3 = m1.data[r][2] * m2.data[2][c];
-    let v4 = m1.data[r][3] * m2.data[3][c];
-
-    v1 + v2 + v3 + v4
+impl Mul<f32> for Mat4x4 {
+    type Output = Mat4x4;
+    fn mul(self, rhs: f32) -> Self::Output {
+        rhs * self
+    }
 }
 
 impl Mul<Mat4x4> for Mat4x4 {
     type Output = Mat4x4;
     fn mul(self, rhs: Mat4x4) -> Self::Output {
+        // matrix multiplication helper.
+        // multiply corresponding row and column elements
+        let rxc = |r: usize, c: usize, m1: &Mat4x4, m2: &Mat4x4| -> f32 {
+            let v1 = m1.data[r][0] * m2.data[0][c];
+            let v2 = m1.data[r][1] * m2.data[1][c];
+            let v3 = m1.data[r][2] * m2.data[2][c];
+            let v4 = m1.data[r][3] * m2.data[3][c];
+
+            v1 + v2 + v3 + v4
+        };
+
         Self {
             data: [
                 [
@@ -390,20 +362,6 @@ impl Mul<Mat4x4> for Mat4x4 {
                 ],
             ],
         }
-    }
-}
-impl Mul<f32> for Mat4x4 {
-    type Output = Mat4x4;
-    fn mul(self, rhs: f32) -> Self::Output {
-        let mut result = Mat4x4::identity();
-
-        for i in 0..4 {
-            for j in 0..4 {
-                result.data[i][j] = self.data[i][j] * rhs;
-            }
-        }
-
-        result
     }
 }
 

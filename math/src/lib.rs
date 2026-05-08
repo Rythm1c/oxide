@@ -5,6 +5,7 @@
 // most of this is just the books code translated to rust with a few changes here and there.
 // and https://songho.ca/opengl/ was also pretty helpfull
 
+pub mod mat2x2;
 pub mod mat3x3;
 pub mod mat4x4;
 pub mod quaternion;
