@@ -71,7 +71,7 @@ impl Quat {
         f32::sqrt(x2 + y2 + z2 + s2)
     }
 
-    pub fn unit(&self) -> Self {
+    pub fn normalize(&self) -> Self {
         let coeff = 1.0 / self.norm();
 
         Self {
@@ -102,7 +102,7 @@ impl Quat {
     }
 
     pub fn nlerp(&self, other: Self, c: f32) -> Quat {
-        (*self + (other - *self) * c).unit()
+        (*self + (other - *self) * c).normalize()
     }
 
     pub fn axis(&self) -> Vec3 {

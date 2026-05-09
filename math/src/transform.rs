@@ -26,6 +26,21 @@ impl Transform {
         }
     }
 
+    pub fn scaling(mut self, scaling: Vec3) -> Self {
+        self.scaling = scaling;
+        self
+    }
+
+    pub fn orientation(mut self, orientation: Quat) -> Self{
+        self.orientation = orientation;
+        self
+    }
+
+    pub fn translation(mut self, trans: Vec3) -> Self{
+        self.translation = trans;
+        self
+    }
+
     pub fn lerp(&self, other: &Self, factor: f32) -> Transform {
         Self {
             translation: self.translation.mix(other.translation, factor),

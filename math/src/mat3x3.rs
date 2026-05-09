@@ -1,6 +1,6 @@
 use std::ops::Mul;
 
-use crate::mat2x2::Mat2x2;
+use crate::{mat2x2::Mat2x2, vec3::Vec3};
 
 use super::quaternion::Quat;
 
@@ -201,5 +201,25 @@ impl Mul<Mat3x3> for Mat3x3{
             ]
         }
 
+    }
+}
+
+impl Mul<Vec3> for Mat3x3 {
+    type Output = Vec3;
+    fn mul(self, rhs: Vec3) -> Self::Output {
+        //helper function
+        let rxv = |m: &[[f32; 3]; 3],v: &Vec3, r: usize|-> f32 {
+            let a = m[r][0] * v.x; 
+            let b = m[r][1] * v.y;
+            let c = m[r][2] * v.z;
+
+            a + b + c 
+        };
+
+        Vec3 {
+        x: rxv(&self.data, &rhs, 0),
+        y: rxv(&self.data, &rhs, 1),
+        z: rxv(&self.data, &rhs, 2),
+        }
     }
 }
