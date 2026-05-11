@@ -1,12 +1,12 @@
 use super::scene::Scene;
 
 use engine_core::{
-    context::VkContext, 
+    context::VkContext,
     descriptor::{
         GlobalDescriptorSet,
         MaterialAllocator
-        }, 
-    pipeline::RenderPipeline, 
+        },
+    pipeline::RenderPipeline,
     renderer::Renderer, shadowmap::ShadowMap
 };
 
@@ -46,15 +46,16 @@ impl VulkanCore {
         )?;
 
         //100 objects for now
-        let material_allocator = 
+        let material_allocator =
             MaterialAllocator::new(Arc::clone(&context.device_ctx), 100)?;
 
         let pipeline = RenderPipeline::create(
             Arc::clone(&context),
-            globals.layout(), 
+            globals.layout(),
             material_allocator.layout())?;
 
-        let renderer = Renderer::new(Arc::clone(&context));
+        let mut renderer = Renderer::new(Arc::clone(&context));
+        renderer.set_clear_color([0.2, 0.3, 0.7, 1.0]);
 
         Ok(VulkanCore {
             globals,
@@ -63,7 +64,7 @@ impl VulkanCore {
             shadow_map,
             pipeline,
             renderer,
-            
+
         })
     }
 }
@@ -120,7 +121,7 @@ impl ApplicationHandler for App {
             Some(VulkanCore::new("Vulkan App", self.window.as_ref().unwrap()).unwrap());
 
         println!("move camera with w,a,s,d keys\nrotate camera by right clicking and dragging");
-        
+
         // Upload all scene objects to GPU
         if let Some(core) = &mut self.vulkan_core {
             let device_ctx = Arc::clone(&core.context.device_ctx);
@@ -136,7 +137,7 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
-                
+
                 // Wait for GPU to finish all rendering before destroying geometry buffers
                 if let Some(ref core) = self.vulkan_core {
                     unsafe { core.context.device().device_wait_idle().unwrap() };
@@ -158,7 +159,7 @@ impl ApplicationHandler for App {
                         scene.update(dt);
                         let frame = core.renderer.get_current_frame();
 
-                        core.globals.flush(frame, 
+                        core.globals.flush(frame,
                             &scene.camera_ubo(),
                             &scene.light_ubo())
                         .expect("failed to update globals");
@@ -166,9 +167,9 @@ impl ApplicationHandler for App {
                         match core
                             .renderer
                             .render(
-                                &core.pipeline, 
-                                &core.globals, 
-                                &core.shadow_map, 
+                                &core.pipeline,
+                                &core.globals,
+                                &core.shadow_map,
                                 scene.light.proj_view_matrix(),
                                 &scene.render_objects())
                         {

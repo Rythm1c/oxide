@@ -15,9 +15,6 @@ pub struct Contact {
 
     pub normal: Vec3,
 
-    pub separation_distance: f32,
-    pub time_of_impact: f32,
-
     pub body_a: BodyHandle,
     pub body_b: BodyHandle,
 }
@@ -37,9 +34,6 @@ impl Contact {
             collision: false,
 
             normal: Vec3::ZERO,
-
-            separation_distance: 0.0,
-            time_of_impact: 0.0,
         }
     }
 }
