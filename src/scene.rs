@@ -8,9 +8,7 @@ use engine_core::ubo::{CameraUbo, LightUbo};
 
 use geometry::Shape;
 use math::mat4x4::Mat4x4;
-use math::quaternion::Quat;
 use math::vec3::Vec3;
-use physics::collider::ColliderType;
 use physics::rigidbody::RigidBody;
 use physics::world::PhyWorld;
 

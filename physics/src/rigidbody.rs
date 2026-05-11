@@ -71,7 +71,9 @@ impl RigidBody {
             .to_mat()
     }
 
-
+    pub fn apply_impulse_linear(&mut self, impulse: Vec3) {
+        self.velocity = self.velocity + impulse * self.get_inv_mass();
+    }
 
     pub fn mass(mut self, value: f32) -> Self {
         self.mass = value;

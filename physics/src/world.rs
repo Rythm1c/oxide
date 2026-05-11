@@ -12,7 +12,7 @@ impl Default for PhyWorld {
     fn default() -> Self {
         Self {
             rigid_bodies: Vec::new(),
-            gravity: Vec3::new(0.0, -9.81, 0.0),
+            gravity: Vec3::new(0.0, -9.8, 0.0),
         }
     }
 }
@@ -28,11 +28,13 @@ impl PhyWorld {
 
     pub fn update(&mut self, dt: f32) {
         for body in self.rigid_bodies.iter_mut() {
-            if body.mass == f32::INFINITY {
+            if body.mass.is_infinite() {
                 continue;
             }
-            // acceleration due to gravity
-            body.velocity = body.velocity + self.gravity * dt;
+            // I = dp , F = dp / dt => dp = F * dt => I = F * dt
+            // F = mg
+            let impulse_gravity = self.gravity * body.mass * dt;
+            body.apply_impulse_linear(impulse_gravity);
 
             // also update position with velocity
             body.position = body.position + body.velocity * dt;
