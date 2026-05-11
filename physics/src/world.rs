@@ -1,6 +1,6 @@
 use math::vec3::Vec3;
 
-use crate::{collision::test_sphere_shere_intersection, rigidbody::RigidBody};
+use crate::{collision::{resolve_contact, test_sphere_shere_intersection}, rigidbody::RigidBody};
 
 pub struct PhyWorld {
     pub rigid_bodies: Vec<RigidBody>,
@@ -41,10 +41,7 @@ impl PhyWorld {
                     continue;
                 }
 
-                if test_sphere_shere_intersection(&bodies[i], &bodies[j])? {
-                    bodies[i].velocity = Vec3::ZERO;
-                    bodies[j].velocity = Vec3::ZERO;
-                }
+                resolve_contact(&test_sphere_shere_intersection(i, j, bodies)?, bodies);
             }
         }
 

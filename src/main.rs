@@ -40,13 +40,13 @@ fn main() -> anyhow::Result<()> {
     scene.add_object(
         Material::polished(true, 8.0, 0.4),
         Shape::UVSphere {
-            radius: 1.0,
+            radius: 0.6,
             segments: 40,
             rings: 40,
             color: None,
         },
         RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 1.0 })
+            .collider_type(ColliderType::Sphere { radius: 0.6 })
             .position(Vec3::new(3.0, 10.0, 0.0))
             .mass(30.0),
     );
@@ -54,12 +54,12 @@ fn main() -> anyhow::Result<()> {
     scene.add_object(
         Material::rubber(false, 10.0, 0.4),
         Shape::CubeSphere {
-            radius: 0.8,
+            radius: 0.6,
             subdivisions: 50,
             color: None,
         },
         RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 0.8 })
+            .collider_type(ColliderType::Sphere { radius: 0.6 })
             .position(Vec3::new(-3.0, 10.0, 0.0))
             .mass(30.0),
     );
