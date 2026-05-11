@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
             color: Some([0.3, 0.6, 0.7]),
         },
         RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 0.6 })
+            .collider_type(ColliderType::Sphere { radius: 0.6 })// same radius as Shape struct
             .position(Vec3::new(0.0, 10.0, 0.0))
             .mass(20.0), // using  kilograms
     );
