@@ -5,7 +5,7 @@ use crate::collider::ColliderType;
 pub struct RigidBody {
     pub mass: f32,
 
-    pub linear_damping: f32,
+    pub resitution: f32,
 
     pub position: Vec3,
 
@@ -23,7 +23,7 @@ impl Default for RigidBody {
     fn default() -> Self {
         Self {
             mass: 10.0,
-            linear_damping: 0.3,
+            resitution: 0.5,
             position: Vec3::ZERO,
             orientation: Quat::ZERO,
             velocity: Vec3::ZERO,
@@ -80,8 +80,8 @@ impl RigidBody {
         self
     }
 
-    pub fn linear_damping(mut self, value: f32) -> Self {
-        self.linear_damping = value;
+    pub fn resitution(mut self, value: f32) -> Self {
+        self.resitution = value;
         self
     }
 

@@ -75,7 +75,8 @@ fn main() -> anyhow::Result<()> {
         RigidBody::default()
             .collider_type(ColliderType::Sphere { radius: 1000.0 })
             .position(Vec3::new(0.0, -1002.0, 0.0))
-            .mass(f32::INFINITY),
+            .mass(f32::INFINITY)
+            .resitution(1.0),
     );
 
     app.set_scene(Arc::new(scene));
