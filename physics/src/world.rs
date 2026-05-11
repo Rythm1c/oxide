@@ -28,7 +28,7 @@ impl PhyWorld {
 
     pub fn update(&mut self, dt: f32) {
         for body in self.rigid_bodies.iter_mut() {
-            if body.inv_mass == 0.0 {
+            if body.mass == f32::INFINITY {
                 continue;
             }
             // acceleration due to gravity

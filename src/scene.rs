@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::object::Object;
+use crate::object::{Material, Object};
 
 use engine_core::descriptor::MaterialAllocator;
 use engine_core::device::DeviceContext;
@@ -36,29 +36,13 @@ impl Scene {
     }
 
     /// Adds an object to the scene (thread-safe).
-    pub fn add_object(&self, object: Object, pos: Vec3, scale: Vec3, rot: Quat, inv_mass: f32) {
-        let mut obj = object;
-        let shape = obj.geometry().shape();
+    pub fn add_object(&self, material: Material, shape: Shape, body: RigidBody) {
+        let mut object = Object::new(shape, material);
+        object.transform_mut().translation = body.position;
+        object.transform_mut().orientation = body.orientation;
+        self.objects.lock().unwrap().push(object);
 
-        let body = match shape {
-            Shape::CubeSphere { radius, .. } => RigidBody::default()
-                .collider_type(ColliderType::Sphere { radius: *radius })
-                .position(pos)
-                .orientation(rot)
-                .inv_mass(inv_mass),
-            Shape::UVSphere { radius, .. } => RigidBody::default()
-                .collider_type(ColliderType::Sphere { radius: *radius })
-                .position(pos)
-                .orientation(rot)
-                .inv_mass(inv_mass),
-            _ => RigidBody::default(),
-        };
         self.physics_world.lock().unwrap().add_body(body);
-
-        obj.transform_mut().translation = pos;
-        obj.transform_mut().scaling = scale;
-        obj.transform_mut().orientation = rot;
-        self.objects.lock().unwrap().push(obj);
     }
 
     /// Returns render objects for all scene objects.

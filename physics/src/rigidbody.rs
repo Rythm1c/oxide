@@ -3,7 +3,7 @@ use math::{mat3x3::Mat3x3, mat4x4::Mat4x4, quaternion::Quat, transform::Transfor
 use crate::collider::ColliderType;
 
 pub struct RigidBody {
-    pub inv_mass: f32,
+    pub mass: f32,
 
     pub linear_damping: f32,
 
@@ -22,7 +22,7 @@ pub struct RigidBody {
 impl Default for RigidBody {
     fn default() -> Self {
         Self {
-            inv_mass: 1.0,
+            mass: 10.0,
             linear_damping: 0.3,
             position: Vec3::ZERO,
             orientation: Quat::ZERO,
@@ -59,6 +59,10 @@ impl RigidBody {
             })
     }
 
+    pub fn get_inv_mass(&self) -> f32 {
+        1.0 / self.mass
+    }
+
     // combines rotation and translation into a tranform matrix
     pub fn get_transform_matrix(&self) -> Mat4x4 {
         Transform::default()
@@ -69,8 +73,8 @@ impl RigidBody {
 
 
 
-    pub fn inv_mass(mut self, value: f32) -> Self {
-        self.inv_mass = value;
+    pub fn mass(mut self, value: f32) -> Self {
+        self.mass = value;
         self
     }
 
