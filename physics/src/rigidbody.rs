@@ -50,13 +50,30 @@ impl RigidBody {
         Ok(self.position + self.orientation * cmbs)
     }
 
-    pub fn get_inverse_inertia_tensor(&self) -> anyhow::Result<Mat3x3> {
+    pub fn get_inverse_inertia_tensor_body_space(&self) -> anyhow::Result<Mat3x3> {
         self.collider_type
             .as_ref()
-            .map(|iit| iit.get_inverse_inertia_tensor())
+            .map(|iit| iit.get_inertia_tensor().inverse() * self.get_inv_mass())
             .ok_or_else(|| {
                 anyhow::anyhow!("body collider type not set, cannot get inverse inertia tensor")
             })
+    }
+
+    pub fn get_inverse_inertia_tensor_world_space(&self) -> anyhow::Result<Mat3x3> {
+        let inv_inertia_tensor_body_space = self.get_inverse_inertia_tensor_body_space()?;
+        let orient = self.orientation.to_mat3x3();
+        Ok(orient * inv_inertia_tensor_body_space * orient.transpose())
+    }
+
+    pub fn get_ineria_tensor_body_space(&self) -> anyhow::Result<Mat3x3> {
+        let inertia_tensor = self
+            .collider_type
+            .as_ref()
+            .map(|ct| ct.get_inertia_tensor())
+            .ok_or_else(|| {
+                anyhow::anyhow!("body collider type not set, cannot get inertia tensor")
+            })?;
+        Ok(inertia_tensor)
     }
 
     pub fn get_inv_mass(&self) -> f32 {
