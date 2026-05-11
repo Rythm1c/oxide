@@ -162,7 +162,7 @@ impl Default for Light {
     fn default() -> Self {
         Light {
             color: [10.0; 3],
-            direction: [0.2, -1.0, -0.5],
+            direction: [0.6, -0.7, -0.5],
         }
     }
 }

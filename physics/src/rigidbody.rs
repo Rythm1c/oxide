@@ -60,6 +60,10 @@ impl RigidBody {
     }
 
     pub fn get_inv_mass(&self) -> f32 {
+        if self.mass.is_infinite() {
+            return 0.0;
+        }
+
         1.0 / self.mass
     }
 

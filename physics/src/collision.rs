@@ -62,8 +62,9 @@ pub fn test_sphere_shere_intersection(
         contact.collision = true;
         contact.normal = ab.normalize();
 
-        contact.pt_a_world_space = bodies[a].position - contact.normal * ra;
-        contact.pt_b_world_space = bodies[b].position + contact.normal * rb;
+        contact.pt_a_world_space = bodies[a].position + contact.normal * ra;
+        contact.pt_b_world_space = bodies[b].position - contact.normal * rb;
+
         return Ok(contact);
     }
 
@@ -75,9 +76,19 @@ pub fn resolve_contact(contact: &Contact, bodies: &mut Vec<RigidBody>) {
     if !contact.collision {
         return;
     }
+    let a = contact.body_a;
+    let b = contact.body_b;
 
-    bodies[contact.body_a].velocity = Vec3::ZERO;
-    bodies[contact.body_b].velocity = Vec3::ZERO;
+    bodies[a].velocity = Vec3::ZERO;
+    bodies[b].velocity = Vec3::ZERO;
+
+    let ta = bodies[a].get_inv_mass() / (bodies[a].get_inv_mass() + bodies[b].get_inv_mass());
+    let tb = bodies[b].get_inv_mass() / (bodies[a].get_inv_mass() + bodies[b].get_inv_mass());
+
+    let ds = contact.pt_b_world_space - contact.pt_a_world_space;
+
+    bodies[a].position = bodies[a].position + ds * ta;
+    bodies[b].position = bodies[b].position - ds * tb;
 }
 
 fn get_radius(ct: &ColliderType) -> anyhow::Result<f32> {
