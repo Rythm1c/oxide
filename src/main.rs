@@ -34,7 +34,7 @@ fn main() -> anyhow::Result<()> {
         RigidBody::default()
             .collider_type(ColliderType::Sphere { radius: 0.6 })// same radius as Shape struct
             .position(Vec3::new(0.0, 10.0, 0.0))
-            .mass(20.0), // using  kilograms
+            .mass(1.0), // using  kilograms
     );
 
     scene.add_object(
@@ -48,7 +48,7 @@ fn main() -> anyhow::Result<()> {
         RigidBody::default()
             .collider_type(ColliderType::Sphere { radius: 0.6 })
             .position(Vec3::new(3.0, 10.0, 0.0))
-            .mass(30.0),
+            .mass(1.0),
     );
 
     scene.add_object(
@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
         RigidBody::default()
             .collider_type(ColliderType::Sphere { radius: 0.6 })
             .position(Vec3::new(-3.0, 10.0, 0.0))
-            .mass(30.0),
+            .mass(1.0),
     );
 
     // floor

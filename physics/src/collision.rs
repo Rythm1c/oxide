@@ -73,14 +73,27 @@ pub fn resolve_contact(contact: &Contact, bodies: &mut Vec<RigidBody>) {
     let a = contact.body_a;
     let b = contact.body_b;
 
-    bodies[a].velocity = Vec3::ZERO;
-    bodies[b].velocity = Vec3::ZERO;
+    /* bodies[a].velocity = Vec3::ZERO;
+    bodies[b].velocity = Vec3::ZERO; */
 
-    let ta = bodies[a].get_inv_mass() / (bodies[a].get_inv_mass() + bodies[b].get_inv_mass());
-    let tb = bodies[b].get_inv_mass() / (bodies[a].get_inv_mass() + bodies[b].get_inv_mass());
+    let inv_mass_a = bodies[a].get_inv_mass();
+    let inv_mass_b = bodies[b].get_inv_mass();
+    let total_inv_mass = inv_mass_a + inv_mass_b;
+
+    // collision impulse
+    let n = &contact.normal;
+    let vab = bodies[a].velocity - bodies[b].velocity;
+    let impulse_j = -2.0 * vab.dot(n) / (total_inv_mass);
+    let vec_impulse_j = *n * impulse_j;
+
+    bodies[a].apply_impulse_linear(vec_impulse_j * 1.0);
+    bodies[b].apply_impulse_linear(vec_impulse_j * -1.0);
+
+    // move objects out of each other
+    let ta = inv_mass_a / (total_inv_mass);
+    let tb = inv_mass_b / (total_inv_mass);
 
     let ds = contact.pt_b_world_space - contact.pt_a_world_space;
-
     bodies[a].position = bodies[a].position + ds * ta;
     bodies[b].position = bodies[b].position - ds * tb;
 }
