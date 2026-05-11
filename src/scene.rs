@@ -94,7 +94,7 @@ impl Scene {
     pub fn update(&self, delta_time: f32) {
         self.camera.lock().unwrap().process_keyboard(delta_time);
         // Placeholder for any per-frame scene updates (e.g. animations)
-        self.physics_world.lock().unwrap().update(delta_time);
+        self.physics_world.lock().unwrap().update(delta_time).unwrap();
         self.sync_objects();
     }
 

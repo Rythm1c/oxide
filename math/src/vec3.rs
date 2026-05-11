@@ -52,7 +52,11 @@ impl Vec3 {
     }
     // vector length
     pub fn len(&self) -> f32 {
-        (self.x.powf(2.0) + self.y.powf(2.0) + self.z.powf(2.0)).sqrt()
+        self.len_sqrd().sqrt()
+    }
+    // vector length squared
+    pub fn len_sqrd(&self) -> f32 {
+        self.x.powf(2.0) + self.y.powf(2.0) + self.z.powf(2.0)
     }
 
     // get the normalized vector
