@@ -42,7 +42,7 @@ you should see a sample scene
 - [ ] screen capture
 - [ ] sky box
 - [ ] transparency
-- [ ] physics
+- [ ] Rigid-body physics(work in progress)
 - [ ] 3D model support
 - [ ] animations
 
