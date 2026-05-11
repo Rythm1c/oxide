@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 math = { path = "../math" }
+anyhow = "1.0.102"

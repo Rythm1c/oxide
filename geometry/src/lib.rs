@@ -6,12 +6,13 @@ pub mod uv_sphere;
 
 use engine_core::vertex::Vertex;
 
+#[derive(Clone)]
 pub enum Shape {
     Cube {
         size : f32,
         color: Option<[f32; 3]>,
     },
-    
+
     UVSphere {
         radius  : f32,
         segments: u32,
@@ -19,12 +20,12 @@ pub enum Shape {
         color   : Option<[f32; 3]>,
     },
 
-    CubeSphere { 
-        radius      : f32, 
-        subdivisions: u32, 
-        color       : Option<[f32; 3]> 
+    CubeSphere {
+        radius      : f32,
+        subdivisions: u32,
+        color       : Option<[f32; 3]>
     }
-    /* 
+    /*
 
     Torus { major_radius: f32, minor_radius: f32, major_segments: u32, minor_segments: u32, color: Option<[f32; 3]> },
     , */
@@ -41,11 +42,11 @@ impl Shape {
                 segments,
                 rings,
                 color,
-            } => uv_sphere::generate_uv_sphere(*radius, *segments, *rings, *color), 
+            } => uv_sphere::generate_uv_sphere(*radius, *segments, *rings, *color),
 
-            Shape::CubeSphere { 
-                radius, 
-                subdivisions, 
+            Shape::CubeSphere {
+                radius,
+                subdivisions,
                 color } => {
                 cube_sphere::generate_cube_sphere(*radius, *subdivisions, *color)
             }
@@ -58,18 +59,23 @@ impl Shape {
 pub struct Geometry {
     vertices: Vec<Vertex>,
     indices : Vec<u32>,
+    shape : Shape
 }
 
 impl Geometry {
     /// Creates geometry from a shape definition.
     pub fn new(shape: Shape) -> Self {
         let (vertices, indices) = shape.generate();
-        Self { vertices, indices }
+        Self { vertices, indices, shape }
     }
 
     /// Returns a slice of the vertices.
     pub fn vertices(&self) -> &[Vertex] {
         &self.vertices
+    }
+
+    pub fn shape(&self) -> &Shape {
+        &self.shape
     }
 
     /// Returns a slice of the indices.

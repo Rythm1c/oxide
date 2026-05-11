@@ -1,22 +1,27 @@
-use crate::object::Object;
 use crate::camera::Camera;
+use crate::object::Object;
 
 use engine_core::descriptor::MaterialAllocator;
+use engine_core::device::DeviceContext;
 use engine_core::drawable::RenderObject;
 use engine_core::ubo::{CameraUbo, LightUbo};
-use engine_core::device::DeviceContext;
 
+use geometry::Shape;
 use math::mat4x4::Mat4x4;
 use math::quaternion::Quat;
 use math::vec3::Vec3;
+use physics::collider::ColliderType;
+use physics::rigidbody::RigidBody;
+use physics::world::PhyWorld;
 
-use std::sync::Mutex;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 pub struct Scene {
     pub light: Light,
     pub camera: Mutex<Camera>,
     pub objects: Mutex<Vec<Object>>,
+    physics_world: Mutex<PhyWorld>,
 }
 
 impl Scene {
@@ -26,14 +31,32 @@ impl Scene {
             light: Light::default(),
             camera: Mutex::new(Camera::new(800.0 / 600.0)),
             objects: Mutex::new(Vec::new()),
+            physics_world: Mutex::new(PhyWorld::default()),
         }
     }
 
     /// Adds an object to the scene (thread-safe).
-    pub fn add_object(&self, object: Object, pos: Vec3, scale: Vec3, rot: Quat) {
+    pub fn add_object(&self, object: Object, pos: Vec3, scale: Vec3, rot: Quat, inv_mass: f32) {
         let mut obj = object;
+        let shape = obj.geometry().shape();
+
+        let body = match shape {
+            Shape::CubeSphere { radius, .. } => RigidBody::default()
+                .collider_type(ColliderType::Sphere { radius: *radius })
+                .position(pos)
+                .orientation(rot)
+                .inv_mass(inv_mass),
+            Shape::UVSphere { radius, .. } => RigidBody::default()
+                .collider_type(ColliderType::Sphere { radius: *radius })
+                .position(pos)
+                .orientation(rot)
+                .inv_mass(inv_mass),
+            _ => RigidBody::default(),
+        };
+        self.physics_world.lock().unwrap().add_body(body);
+
         obj.transform_mut().translation = pos;
-        obj.transform_mut().scaling     = scale;
+        obj.transform_mut().scaling = scale;
         obj.transform_mut().orientation = rot;
         self.objects.lock().unwrap().push(obj);
     }
@@ -77,8 +100,7 @@ impl Scene {
             winit::keyboard::KeyCode::Space => {
                 cam.set_motion_up();
             }
-            winit::keyboard::KeyCode::ControlLeft |
-            winit::keyboard::KeyCode::ControlRight => {
+            winit::keyboard::KeyCode::ControlLeft | winit::keyboard::KeyCode::ControlRight => {
                 cam.set_motion_down();
             }
 
@@ -90,6 +112,21 @@ impl Scene {
     pub fn update(&self, delta_time: f32) {
         self.camera.lock().unwrap().process_keyboard(delta_time);
         // Placeholder for any per-frame scene updates (e.g. animations)
+        self.physics_world.lock().unwrap().update(delta_time);
+        self.sync_objects();
+    }
+
+    pub fn sync_objects(&self) {
+        let objects = &mut self.objects.lock().unwrap();
+        let obj_bodies = &self.physics_world.lock().unwrap().rigid_bodies;
+
+        for i in 0..objects.len() {
+            let obj_body = &obj_bodies[i];
+            let object = &mut objects[i];
+
+            object.transform_mut().translation = obj_body.position;
+            object.transform_mut().orientation = obj_body.orientation;
+        }
     }
 
     /// Rotates the camera based on mouse movement.
@@ -109,10 +146,10 @@ impl Scene {
         let col = self.light.color;
         let matrix = self.light.proj_view_matrix();
         LightUbo {
-            camera_pos : [cpos[0], cpos[1], cpos[2], 0.0],
-            light_dir  : [ dir[0],  dir[1],  dir[2], 0.0],
-            light_color: [ col[0],  col[1],  col[2], 1.0],
-            light_space: matrix
+            camera_pos: [cpos[0], cpos[1], cpos[2], 0.0],
+            light_dir: [dir[0], dir[1], dir[2], 0.0],
+            light_color: [col[0], col[1], col[2], 1.0],
+            light_space: matrix,
         }
     }
 
@@ -121,8 +158,8 @@ impl Scene {
     pub fn upload_all_objects(
         &self,
         device_ctx: Arc<DeviceContext>,
-        material_allocator: &mut MaterialAllocator)
-        -> anyhow::Result<()> {
+        material_allocator: &mut MaterialAllocator,
+    ) -> anyhow::Result<()> {
         let mut objects = self.objects.lock().unwrap();
         for obj in objects.iter_mut() {
             if !obj.is_uploaded() {
@@ -135,14 +172,14 @@ impl Scene {
 }
 
 pub struct Light {
-    pub color    : [f32; 3],
+    pub color: [f32; 3],
     pub direction: [f32; 3],
 }
 
 impl Default for Light {
     fn default() -> Self {
         Light {
-            color    : [10.0; 3],
+            color: [10.0; 3],
             direction: [0.2, -1.0, -0.5],
         }
     }
@@ -150,7 +187,6 @@ impl Default for Light {
 
 impl Light {
     pub fn proj_view_matrix(&self) -> [[f32; 4]; 4] {
-
         let direction = Vec3::from(&self.direction);
         let light_pos = Vec3::ZERO - direction.normalize() * 15.0;
 

@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
     let mut app = App::new();
     // Create the scene
     let scene = Scene::new();
-    scene.add_object(
+   /*  scene.add_object(
         object::Object::new(
             geometry::Shape::Cube {
                 size: 2.0,
@@ -30,6 +30,22 @@ fn main() -> anyhow::Result<()> {
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
         Quat::ZERO,
+    ); */
+
+    scene.add_object(
+        object::Object::new(
+            geometry::Shape::UVSphere {
+                radius: 0.6,
+                segments: 40,
+                rings: 40,
+                color: Some([0.3, 0.6, 0.7]),
+            },
+            Material::stone(false, 8.0, 0.4),
+        ),
+        Vec3::new(0.0, 10.0, 0.0),
+        Vec3::new(1.0, 1.0, 1.0),
+        Quat::ZERO,
+        1.0
     );
 
     scene.add_object(
@@ -42,9 +58,10 @@ fn main() -> anyhow::Result<()> {
             },
             Material::polished(true, 8.0, 0.4),
         ),
-        Vec3::new(3.0, 0.0, 0.0),
+        Vec3::new(3.0, 10.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
         Quat::ZERO,
+        1.0
     );
 
     scene.add_object(
@@ -56,11 +73,13 @@ fn main() -> anyhow::Result<()> {
             },
             Material::rubber(false, 10.0, 0.4),
         ),
-        Vec3::new(-3.0, 0.0, 0.0),
+        Vec3::new(-3.0, 10.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
         Quat::ZERO,
+        1.0
     );
 
+    // floor
     scene.add_object(
         object::Object::new(
             geometry::Shape::CubeSphere {
@@ -73,8 +92,9 @@ fn main() -> anyhow::Result<()> {
         Vec3::new(0.0, -1002.0, 0.0),
         Vec3::new(1.0, 1.0, 1.0),
         Quat::ZERO,
+        0.0
     );
-    
+
     app.set_scene(Arc::new(scene));
     // Run the application
     app::run(app)?;

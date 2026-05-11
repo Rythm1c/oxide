@@ -1,18 +1,22 @@
-use math::{mat4x4::Mat4x4, quaternion::Quat, transform::Transform, vec3::Vec3};
+use math::{mat3x3::Mat3x3, mat4x4::Mat4x4, quaternion::Quat, transform::Transform, vec3::Vec3};
+
+use crate::collider::ColliderType;
 
 pub struct RigidBody {
-    inv_mass: f32,
+    pub inv_mass: f32,
 
-    linear_damping: f32,
+    pub linear_damping: f32,
 
-    position: Vec3,
+    pub position: Vec3,
 
-    orientation: Quat,
+    pub orientation: Quat,
 
-    velocity: Vec3,
+    /// linear velocity
+    pub velocity: Vec3,
 
-    rotation: Vec3,
-    //transform: Transform,
+    pub rotation: Vec3,
+
+    pub collider_type: Option<ColliderType>,
 }
 
 impl Default for RigidBody {
@@ -24,12 +28,47 @@ impl Default for RigidBody {
             orientation: Quat::ZERO,
             velocity: Vec3::ZERO,
             rotation: Vec3::ZERO,
-            //transform: Transform::default(),
+            collider_type: None,
         }
     }
 }
 
 impl RigidBody {
+    pub fn get_center_of_mass_body_space(&self) -> anyhow::Result<Vec3> {
+        self.collider_type
+            .as_ref()
+            .map(|ct| ct.get_center_of_mass())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "body collider type not set, cannot get center of mass in world space"
+                )
+            })
+    }
+
+    pub fn get_center_of_mass_world_space(&self) -> anyhow::Result<Vec3> {
+        let cmbs = self.get_center_of_mass_body_space()?;
+        Ok(self.position + self.orientation * cmbs)
+    }
+
+    pub fn get_inverse_inertia_tensor(&self) -> anyhow::Result<Mat3x3> {
+        self.collider_type
+            .as_ref()
+            .map(|iit| iit.get_inverse_inertia_tensor())
+            .ok_or_else(|| {
+                anyhow::anyhow!("body collider type not set, cannot get inverse inertia tensor")
+            })
+    }
+
+    // combines rotation and translation into a tranform matrix
+    pub fn get_transform_matrix(&self) -> Mat4x4 {
+        Transform::default()
+            .translation(self.position)
+            .orientation(self.orientation.normalize())
+            .to_mat()
+    }
+
+
+
     pub fn inv_mass(mut self, value: f32) -> Self {
         self.inv_mass = value;
         self
@@ -60,14 +99,8 @@ impl RigidBody {
         self
     }
 
-    //TODO: Complete this function
-    //pub fn calculate_derived_data(&mut self) {}
-
-    // combines rotation and translation into a tranform matrix
-    pub fn transform_matrix(&self) -> Mat4x4 {
-        Transform::default()
-            .translation(self.position)
-            .orientation(self.orientation.normalize())
-            .to_mat()
+    pub fn collider_type(mut self, collider_type: ColliderType) -> Self {
+        self.collider_type = Some(collider_type);
+        self
     }
 }
