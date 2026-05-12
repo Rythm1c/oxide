@@ -1,174 +1,180 @@
 use math::{mat3x3::Mat3x3, mat4x4::Mat4x4, quaternion::Quat, transform::Transform, vec3::Vec3};
 
-use crate::collider::ColliderType;
+use crate::collider::Collider;
+
+// ── RigidBody ─────────────────────────────────────────────────────────────────
+//
+// Invariant: every RigidBody always has a collider.
+// This is enforced by making the constructor private and requiring callers
+// to go through RigidBodyBuilder, which cannot produce a body without one.
 
 pub struct RigidBody {
+    // Physical properties
     pub mass: f32,
+    pub restitution: f32,
+    pub friction: f32,
 
-    pub resitution: f32,
-
+    // State
     pub position: Vec3,
-
     pub orientation: Quat,
-
-    /// linear velocity
     pub velocity: Vec3,
-
     pub angular_velocity: Vec3,
 
-    pub rotation: Vec3,
-
-    pub collider_type: Option<ColliderType>,
-}
-
-impl Default for RigidBody {
-    fn default() -> Self {
-        Self {
-            mass: 10.0,
-            resitution: 0.5,
-            position: Vec3::ZERO,
-            orientation: Quat::ZERO,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
-            rotation: Vec3::ZERO,
-            collider_type: None,
-        }
-    }
+    // Shape — always present, never None
+    collider: Collider,
 }
 
 impl RigidBody {
-    pub fn get_center_of_mass_body_space(&self) -> anyhow::Result<Vec3> {
-        self.collider_type
-            .as_ref()
-            .map(|ct| ct.get_center_of_mass())
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "body collider type not set, cannot get center of mass in world space"
-                )
-            })
+    /// Only entry point: go through the builder.
+    pub fn builder(collider: Collider) -> RigidBodyBuilder {
+        RigidBodyBuilder::new(collider)
     }
 
-    pub fn get_center_of_mass_world_space(&self) -> anyhow::Result<Vec3> {
-        let cmbs = self.get_center_of_mass_body_space()?;
-        Ok(self.position + self.orientation * cmbs)
+    // ── Collider delegation ───────────────────────────────────────────────────
+
+    pub fn collider(&self) -> &Collider {
+        &self.collider
     }
 
-    pub fn get_inverse_inertia_tensor_body_space(&self) -> anyhow::Result<Mat3x3> {
-        self.collider_type
-            .as_ref()
-            .map(|iit| iit.get_inertia_tensor().inverse() * self.get_inv_mass())
-            .ok_or_else(|| {
-                anyhow::anyhow!("body collider type not set, cannot get inverse inertia tensor")
-            })
+    pub fn inv_mass(&self) -> f32 {
+        if self.mass.is_infinite() { 0.0 } else { 1.0 / self.mass }
     }
 
-    pub fn get_inverse_inertia_tensor_world_space(&self) -> anyhow::Result<Mat3x3> {
-        let inv_inertia_tensor_body_space = self.get_inverse_inertia_tensor_body_space()?;
-        let orient = self.orientation.to_mat3x3();
-        Ok(orient * inv_inertia_tensor_body_space * orient.transpose())
+    /// Inverse inertia tensor in body space, already scaled by inv_mass.
+    pub fn inv_inertia_tensor_body(&self) -> Mat3x3 {
+        self.collider.inertia_tensor().inverse() * self.inv_mass()
     }
 
-    pub fn get_ineria_tensor_body_space(&self) -> anyhow::Result<Mat3x3> {
-        let inertia_tensor = self
-            .collider_type
-            .as_ref()
-            .map(|ct| ct.get_inertia_tensor())
-            .ok_or_else(|| {
-                anyhow::anyhow!("body collider type not set, cannot get inertia tensor")
-            })?;
-        Ok(inertia_tensor)
+    /// Inverse inertia tensor rotated into world space.
+    /// I_world^-1 = R * I_body^-1 * R^T
+    pub fn inv_inertia_tensor_world(&self) -> Mat3x3 {
+        let r = self.orientation.to_mat3x3();
+        r * self.inv_inertia_tensor_body() * r.transpose()
     }
 
-    pub fn get_inv_mass(&self) -> f32 {
-        1.0 / self.mass
+    /// CoM in body space (comes from the collider shape).
+    pub fn center_of_mass_body(&self) -> Vec3 {
+        self.collider.center_of_mass()
     }
 
-    // combines rotation and translation into a tranform matrix
-    pub fn get_transform_matrix(&self) -> Mat4x4 {
+    /// CoM transformed into world space.
+    pub fn center_of_mass_world(&self) -> Vec3 {
+        self.position + self.orientation * self.center_of_mass_body()
+    }
+
+    // ── Transform ─────────────────────────────────────────────────────────────
+
+    pub fn transform_matrix(&self) -> Mat4x4 {
         Transform::default()
             .translation(self.position)
             .orientation(self.orientation.normalize())
             .to_mat()
     }
 
-    pub fn apply_impulse(&mut self, impulse: Vec3, point: Vec3) {
-        self.apply_impulse_linear(impulse);
-
-        let pos = self.get_center_of_mass_world_space().unwrap();
-
-        let r = point - pos;
-        let dl = r.cross(&impulse);
-        self.apply_impulse_angular(dl);
-    }
+    // ── Impulse application ───────────────────────────────────────────────────
 
     pub fn apply_impulse_linear(&mut self, impulse: Vec3) {
-        self.velocity = self.velocity + impulse * self.get_inv_mass();
+        self.velocity = self.velocity + impulse * self.inv_mass();
     }
 
+    /// `impulse` here is an angular momentum impulse (torque * dt).
     pub fn apply_impulse_angular(&mut self, impulse: Vec3) {
-        self.angular_velocity = self.get_inverse_inertia_tensor_world_space().unwrap() * impulse;
-        let max_angular_velocity = 30.0;
-        if self.angular_velocity.len_sqrd() > (max_angular_velocity * max_angular_velocity) {
-            self.angular_velocity = self.angular_velocity.normalize() * max_angular_velocity;
+        self.angular_velocity =
+            self.angular_velocity + self.inv_inertia_tensor_world() * impulse;
+
+        const MAX_ANG_VEL: f32 = 30.0;
+        if self.angular_velocity.len_sqrd() > MAX_ANG_VEL * MAX_ANG_VEL {
+            self.angular_velocity = self.angular_velocity.normalize() * MAX_ANG_VEL;
         }
     }
 
+    /// Apply a linear + angular impulse at a world-space contact point.
+    pub fn apply_impulse_at_point(&mut self, impulse: Vec3, point: Vec3) {
+        if self.mass.is_infinite() {
+            return;
+        }
+        self.apply_impulse_linear(impulse);
+        let r = point - self.center_of_mass_world();
+        self.apply_impulse_angular(r.cross(&impulse));
+    }
+
+    // ── Integration ───────────────────────────────────────────────────────────
+
     pub fn update(&mut self, dt: f32) {
+        if self.mass.is_infinite() {
+            return;
+        }
+
+        // Linear integration
         self.position = self.position + self.velocity * dt;
 
-        let pos_cm = self.get_center_of_mass_world_space().unwrap();
-        let cm_to_pos = self.position - pos_cm;
+        //   α = I^-1 * (ω × (I * ω))
+        let cm = self.center_of_mass_world();
+        let cm_to_pos = self.position - cm;
 
-        let orientation = self.orientation.to_mat3x3();
-        let intertia_tensor = orientation
-            * self.collider_type.as_ref().unwrap().get_inertia_tensor()
-            * orientation.transpose();
-        let alpha = intertia_tensor.inverse()
-            * (self
-                .angular_velocity
-                .cross(&(intertia_tensor * self.angular_velocity)));
+        let r = self.orientation.to_mat3x3();
+        let inertia_world = r * self.collider.inertia_tensor() * r.transpose();
+        let alpha = inertia_world.inverse()
+            * self.angular_velocity.cross(&(inertia_world * self.angular_velocity));
         self.angular_velocity = self.angular_velocity + alpha * dt;
 
         let d_angle = self.angular_velocity * dt;
-        let dq = Quat::create(d_angle.len(), d_angle);
-        self.orientation = dq * self.orientation;
-        self.orientation = self.orientation.normalize();
+        let angle = d_angle.len();
+        let dq = if angle > 1e-8 {
+            Quat::from_radians(angle, d_angle)
+        } else {
+            Quat::ZERO
+        };
 
-        self.position = pos_cm + dq * cm_to_pos;
+        self.orientation = (dq * self.orientation).normalize();
+        self.position = cm + dq * cm_to_pos;
+    }
+}
+
+pub struct RigidBodyBuilder {
+    collider:         Collider,
+    mass:             f32,
+    restitution:      f32,
+    friction:         f32,
+    position:         Vec3,
+    orientation:      Quat,
+    velocity:         Vec3,
+    angular_velocity: Vec3,
+}
+
+impl RigidBodyBuilder {
+    pub fn new(collider: Collider) -> Self {
+        Self {
+            collider,
+            mass:             10.0,
+            restitution:      0.5,
+            friction:         0.5,
+            position:         Vec3::ZERO,
+            orientation:      Quat::ZERO,
+            velocity:         Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
+        }
     }
 
-    pub fn mass(mut self, value: f32) -> Self {
-        self.mass = value;
-        self
-    }
+    pub fn mass(mut self, v: f32) -> Self              { self.mass = v; self }
+    pub fn restitution(mut self, v: f32) -> Self       { self.restitution = v; self }
+    pub fn friction(mut self, v: f32) -> Self          { self.friction = v; self }
+    pub fn position(mut self, v: Vec3) -> Self         { self.position = v; self }
+    pub fn orientation(mut self, v: Quat) -> Self      { self.orientation = v; self }
+    pub fn velocity(mut self, v: Vec3) -> Self         { self.velocity = v; self }
+    pub fn angular_velocity(mut self, v: Vec3) -> Self { self.angular_velocity = v; self }
 
-    pub fn resitution(mut self, value: f32) -> Self {
-        self.resitution = value;
-        self
-    }
-
-    pub fn position(mut self, value: Vec3) -> Self {
-        self.position = value;
-        self
-    }
-
-    pub fn orientation(mut self, value: Quat) -> Self {
-        self.orientation = value;
-        self
-    }
-
-    pub fn velocity(mut self, value: Vec3) -> Self {
-        self.velocity = value;
-        self
-    }
-
-    pub fn rotation(mut self, value: Vec3) -> Self {
-        self.rotation = value;
-        self
-    }
-
-    pub fn collider_type(mut self, collider_type: ColliderType) -> Self {
-        self.collider_type = Some(collider_type);
-        self
+    /// Consumes the builder and produces a valid RigidBody.
+    pub fn build(self) -> RigidBody {
+        RigidBody {
+            collider:         self.collider,
+            mass:             self.mass,
+            restitution:      self.restitution,
+            friction:         self.friction,
+            position:         self.position,
+            orientation:      self.orientation,
+            velocity:         self.velocity,
+            angular_velocity: self.angular_velocity,
+        }
     }
 }

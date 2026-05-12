@@ -11,7 +11,7 @@ use scene::Scene;
 
 use math::vec3::Vec3;
 
-use physics::{collider::ColliderType, rigidbody::RigidBody};
+use physics::{collider::Collider, collider::SphereCollider, rigidbody::RigidBodyBuilder};
 
 use geometry::Shape;
 
@@ -31,10 +31,10 @@ fn main() -> anyhow::Result<()> {
             rings: 40,
             color: Some([0.3, 0.6, 0.7]),
         },
-        RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 0.6 })// same radius as Shape struct
+        RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(0.6)))
             .position(Vec3::new(0.0, 10.0, 0.0))
-            .mass(1.0), // using  kilograms
+            .mass(1.0)
+            .build(), // using  kilograms
     );
 
     scene.add_object(
@@ -45,10 +45,10 @@ fn main() -> anyhow::Result<()> {
             rings: 40,
             color: None,
         },
-        RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 0.6 })
+        RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(0.6)))
             .position(Vec3::new(3.0, 10.0, 0.0))
-            .mass(1.0),
+            .mass(1.0)
+            .build(),
     );
 
     scene.add_object(
@@ -58,10 +58,10 @@ fn main() -> anyhow::Result<()> {
             subdivisions: 50,
             color: None,
         },
-        RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 0.6 })
+        RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(0.6)))
             .position(Vec3::new(-3.0, 10.0, 0.0))
-            .mass(1.0),
+            .mass(1.0)
+            .build(),
     );
 
     // floor
@@ -72,11 +72,11 @@ fn main() -> anyhow::Result<()> {
             subdivisions: 400,
             color: Some([1.0; 3]),
         },
-        RigidBody::default()
-            .collider_type(ColliderType::Sphere { radius: 1000.0 })
+        RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(1000.0)))
             .position(Vec3::new(0.0, -1002.0, 0.0))
             .mass(f32::INFINITY)
-            .resitution(1.0),
+            .restitution(1.0)
+            .build(),
     );
 
     app.set_scene(Arc::new(scene));

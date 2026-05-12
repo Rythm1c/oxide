@@ -1,31 +1,36 @@
 use math::{mat3x3::Mat3x3, vec3::Vec3};
 
-pub enum ColliderType {
-    Sphere { radius: f32 },
-    //Cube,
-    //Plane
+pub enum Collider {
+    Sphere(SphereCollider),
 }
 
-impl ColliderType {
-    pub fn sphere(radius: f32) -> Self {
-        ColliderType::Sphere { radius }
-    }
-
-    pub fn get_center_of_mass(&self) -> Vec3 {
+impl Collider {
+    pub fn center_of_mass(&self) -> Vec3 {
         match self {
-            ColliderType::Sphere { .. } => Vec3::ZERO,
+            Collider::Sphere(..) => Vec3::ZERO,
         }
     }
 
-    pub fn get_inertia_tensor(&self) -> Mat3x3 {
+    pub fn inertia_tensor(&self) -> Mat3x3 {
         match self {
-            ColliderType::Sphere { radius } => {
-                let mut inertia_tensor = Mat3x3::identity();
-                inertia_tensor.data[0][0] = (2.0 / 5.0) * radius * radius;
-                inertia_tensor.data[1][1] = (2.0 / 5.0) * radius * radius;
-                inertia_tensor.data[2][2] = (2.0 / 5.0) * radius * radius;
-                inertia_tensor
+            Collider::Sphere(sphere) => {
+                let i = (2.0 / 5.0) * sphere.radius * sphere.radius;
+                Mat3x3::new(
+                    i, 0.0, 0.0,
+                    0.0, i, 0.0,
+                    0.0, 0.0, i,
+                )
             }
         }
+    }
+}
+
+pub struct SphereCollider {
+    pub radius: f32,
+}
+
+impl SphereCollider {
+    pub fn new(radius: f32) -> Self {
+        Self { radius }
     }
 }

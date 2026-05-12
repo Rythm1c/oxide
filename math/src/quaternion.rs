@@ -37,9 +37,13 @@ impl Quat {
     /// halves the angle and creates a quaternion from it and the specified axis
     /// and also axis is normalized so no worries
     /// resulting quaternion intended to be used with 'to_mat' function
-    pub fn create(angle: f32, axis: Vec3) -> Self {
-        let s = f32::sin((angle / 2.0).to_radians());
-        let c = f32::cos((angle / 2.0).to_radians());
+    pub fn from_degrees(angle: f32, axis: Vec3) -> Self {
+        Self::from_radians(angle.to_radians(), axis)
+    }
+
+    pub fn from_radians(angle: f32, axis: Vec3) -> Self {
+        let s = f32::sin(angle / 2.0);
+        let c = f32::cos(angle / 2.0);
 
         let unit_axis = Vec3::normalize(&axis);
 
@@ -52,15 +56,15 @@ impl Quat {
     }
 
     pub fn rotation_x(angle: f32) -> Self {
-        Self::create(angle, Vec3::X)
+        Self::from_degrees(angle, Vec3::X)
     }
 
     pub fn rotation_y(angle: f32) -> Self {
-        Self::create(angle, Vec3::Y)
+        Self::from_degrees(angle, Vec3::Y)
     }
 
     pub fn rotation_z(angle: f32) -> Self {
-        Self::create(angle, Vec3::Z)
+        Self::from_degrees(angle, Vec3::Z)
     }
 
     pub fn norm(&self) -> f32 {
