@@ -14,6 +14,8 @@ pub struct RigidBody {
     /// linear velocity
     pub velocity: Vec3,
 
+    pub angular_velocity: Vec3,
+
     pub rotation: Vec3,
 
     pub collider_type: Option<ColliderType>,
@@ -27,6 +29,7 @@ impl Default for RigidBody {
             position: Vec3::ZERO,
             orientation: Quat::ZERO,
             velocity: Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
             rotation: Vec3::ZERO,
             collider_type: None,
         }
@@ -88,8 +91,26 @@ impl RigidBody {
             .to_mat()
     }
 
+    pub fn apply_impulse(&mut self, impulse: Vec3, point: Vec3) {
+        self.apply_impulse_linear(impulse);
+
+        let pos = self.get_center_of_mass_world_space().unwrap();
+
+        let r = point - pos;
+        let d_l = r.cross(&impulse);
+        self.apply_impulse_angular(d_l);
+    }
+
     pub fn apply_impulse_linear(&mut self, impulse: Vec3) {
         self.velocity = self.velocity + impulse * self.get_inv_mass();
+    }
+
+    pub fn apply_impulse_angular(&mut self, impulse: Vec3) {
+        self.angular_velocity = self.get_inverse_inertia_tensor_world_space().unwrap() * impulse;
+        let max_angular_velocity = 30.0;
+        if self.angular_velocity.len_sqrd() > (max_angular_velocity * max_angular_velocity) {
+            self.angular_velocity = self.angular_velocity.normalize() * max_angular_velocity;
+        }
     }
 
     pub fn mass(mut self, value: f32) -> Self {
