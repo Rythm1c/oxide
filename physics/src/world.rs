@@ -59,7 +59,8 @@ impl PhyWorld {
             body.apply_impulse_linear(impulse_gravity);
 
             // also update position with velocity
-            body.position = body.position + body.velocity * dt;
+            //body.position = body.position + body.velocity * dt;
+            body.update(dt);
         }
     }
 }

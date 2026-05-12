@@ -97,8 +97,8 @@ impl RigidBody {
         let pos = self.get_center_of_mass_world_space().unwrap();
 
         let r = point - pos;
-        let d_l = r.cross(&impulse);
-        self.apply_impulse_angular(d_l);
+        let dl = r.cross(&impulse);
+        self.apply_impulse_angular(dl);
     }
 
     pub fn apply_impulse_linear(&mut self, impulse: Vec3) {
@@ -111,6 +111,30 @@ impl RigidBody {
         if self.angular_velocity.len_sqrd() > (max_angular_velocity * max_angular_velocity) {
             self.angular_velocity = self.angular_velocity.normalize() * max_angular_velocity;
         }
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.position = self.position + self.velocity * dt;
+
+        let pos_cm = self.get_center_of_mass_world_space().unwrap();
+        let cm_to_pos = self.position - pos_cm;
+
+        let orientation = self.orientation.to_mat3x3();
+        let intertia_tensor = orientation
+            * self.collider_type.as_ref().unwrap().get_inertia_tensor()
+            * orientation.transpose();
+        let alpha = intertia_tensor.inverse()
+            * (self
+                .angular_velocity
+                .cross(&(intertia_tensor * self.angular_velocity)));
+        self.angular_velocity = self.angular_velocity + alpha * dt;
+
+        let d_angle = self.angular_velocity * dt;
+        let dq = Quat::create(d_angle.len(), d_angle);
+        self.orientation = dq * self.orientation;
+        self.orientation = self.orientation.normalize();
+
+        self.position = pos_cm + dq * cm_to_pos;
     }
 
     pub fn mass(mut self, value: f32) -> Self {
