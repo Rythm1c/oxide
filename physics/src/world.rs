@@ -31,10 +31,9 @@ impl PhyWorld {
         self.gravity = gravity;
     }
 
-    pub fn update(&mut self, dt: f32) -> anyhow::Result<()> {
+    pub fn update(&mut self, dt: f32) {
         self.integrate(dt);
-        self.resolve_collisions()?;
-        Ok(())
+        self.resolve_collisions();
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
@@ -51,7 +50,7 @@ impl PhyWorld {
         }
     }
 
-    fn resolve_collisions(&mut self) -> anyhow::Result<()> {
+    fn resolve_collisions(&mut self) {
         let n = self.rigid_bodies.len();
         for i in 0..n {
             for j in (i + 1)..n {
@@ -73,6 +72,5 @@ impl PhyWorld {
                 resolve_contact(&contact, &mut self.rigid_bodies);
             }
         }
-        Ok(())
     }
 }

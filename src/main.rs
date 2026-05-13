@@ -34,6 +34,7 @@ fn main() -> anyhow::Result<()> {
         RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(0.6)))
             .position(Vec3::new(0.0, 10.0, 0.0))
             .mass(1.0)
+            .restitution(0.0)
             .build(), // using  kilograms
     );
 
@@ -48,6 +49,7 @@ fn main() -> anyhow::Result<()> {
         RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(0.6)))
             .position(Vec3::new(3.0, 10.0, 0.0))
             .mass(1.0)
+            .restitution(0.0)
             .build(),
     );
 
@@ -61,6 +63,7 @@ fn main() -> anyhow::Result<()> {
         RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(0.6)))
             .position(Vec3::new(-3.0, 10.0, 0.0))
             .mass(1.0)
+            .restitution(0.0)
             .build(),
     );
 

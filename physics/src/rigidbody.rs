@@ -83,13 +83,13 @@ impl RigidBody {
             self.angular_velocity + self.inv_inertia_tensor_world() * impulse;
 
         const MAX_ANG_VEL: f32 = 30.0;
-        if self.angular_velocity.len_sqrd() > MAX_ANG_VEL * MAX_ANG_VEL {
+        if self.angular_velocity.len_sqrd() > (MAX_ANG_VEL * MAX_ANG_VEL) {
             self.angular_velocity = self.angular_velocity.normalize() * MAX_ANG_VEL;
         }
     }
 
     /// Apply a linear + angular impulse at a world-space contact point.
-    pub fn apply_impulse_at_point(&mut self, impulse: Vec3, point: Vec3) {
+    pub fn apply_impulse_at_point(&mut self,impulse: Vec3, point: Vec3) {
         if self.mass.is_infinite() {
             return;
         }

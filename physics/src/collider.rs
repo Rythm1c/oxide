@@ -14,7 +14,7 @@ impl Collider {
     pub fn inertia_tensor(&self) -> Mat3x3 {
         match self {
             Collider::Sphere(sphere) => {
-                let i = (2.0 / 5.0) * sphere.radius * sphere.radius;
+                let i = (2.0 / 5.0) * sphere.radius.powf(2.0);
                 Mat3x3::new(
                     i, 0.0, 0.0,
                     0.0, i, 0.0,
