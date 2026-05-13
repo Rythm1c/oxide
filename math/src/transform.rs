@@ -11,7 +11,7 @@ impl Default for Transform {
     fn default() -> Self {
         Self {
             translation: Vec3::ZERO,
-            orientation: Quat::ZERO,
+            orientation: Quat::identity(),
             scaling    : Vec3::ONE,
         }
     }

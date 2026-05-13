@@ -21,8 +21,12 @@ impl Quat {
         x: 0.0,
         y: 0.0,
         z: 0.0,
-        s: 1.0,
+        s: 0.0,
     };
+
+    pub fn identity() -> Self {
+        Self::new(0.0, 0.0, 0.0, 1.0)
+    }
 
     pub fn new(x: f32, y: f32, z: f32, s: f32) -> Self {
         Self { x, y, z, s }
@@ -76,13 +80,19 @@ impl Quat {
     }
 
     pub fn normalize(&self) -> Self {
-        let coeff = 1.0 / self.norm();
+        let n = self.norm();
+
+        if n.abs() < f32::EPSILON {
+                return Self::identity();
+        }
+
+        let inv = 1.0 / n;
 
         Self {
-            x: (coeff * self.x),
-            y: (coeff * self.y),
-            z: (coeff * self.z),
-            s: (coeff * self.s),
+            x: (inv * self.x),
+            y: (inv * self.y),
+            z: (inv * self.z),
+            s: (inv * self.s),
         }
     }
 

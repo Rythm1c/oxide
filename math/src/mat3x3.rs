@@ -1,6 +1,6 @@
 use std::ops::Mul;
 
-use crate::{mat2x2::Mat2x2, vec3::Vec3};
+use crate::vec3::Vec3;
 
 use super::quaternion::Quat;
 
@@ -37,26 +37,20 @@ impl Mat3x3{
 
     pub fn minor(&self, r: u32, c: u32) -> f32 {
         let d = &self.data;
-        let mut arr :Vec<f32> = Vec::with_capacity(4);
+        match (r, c) {
+            (0, 0) => d[1][1] * d[2][2] - d[1][2] * d[2][1],
+            (0, 1) => d[1][0] * d[2][2] - d[1][2] * d[2][0],
+            (0, 2) => d[1][0] * d[2][1] - d[1][1] * d[2][0],
 
-        for i in 0..3 {
-            if i == r {
-                continue;
-            }
+            (1, 0) => d[0][1] * d[2][2] - d[0][2] * d[2][1],
+            (1, 1) => d[0][0] * d[2][2] - d[0][2] * d[2][0],
+            (1, 2) => d[0][0] * d[2][1] - d[0][1] * d[2][0],
 
-            for j in 0..3{
-                if j == c {
-                    continue;
-                }
-
-                arr.push(d[i as usize][j as usize]);
-            }
+            (2, 0) => d[0][1] * d[1][2] - d[0][2] * d[1][1],
+            (2, 1) => d[0][0] * d[1][2] - d[0][2] * d[1][0],
+            (2, 2) => d[0][0] * d[1][1] - d[0][1] * d[1][0],
+            _ => panic!("index out of range"),
         }
-
-        Mat2x2::new(
-            arr[0], arr[1],
-            arr[2], arr[3])
-        .determinant()
     }
 
     pub fn cofactor(&self, r: u32, c: u32) -> f32 {

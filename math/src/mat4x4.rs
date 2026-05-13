@@ -79,32 +79,37 @@ impl Mat4x4 {
         }
     }
 
-    pub fn minor(&self, r : u32, c : u32) -> f32 {
-        let d = &self.data;
-        let mut arr :Vec<f32> = Vec::with_capacity(9);
+    pub fn minor(&self, row : usize, col : usize) -> f32 {
+        let mut out = [[0.0; 3]; 3];
 
-        for i in 0..4 {
-            if i == r {
-                continue;
-            }
+            let mut rr = 0;
 
-            for j in 0..4{
-                if j == c {
+            for r in 0..4 {
+                if r == row {
                     continue;
                 }
 
-                arr.push(d[i as usize][j as usize]);
-            }
-        }
+                let mut cc = 0;
 
-        Mat3x3::new(
-            arr[0], arr[1], arr[2],
-            arr[3], arr[4], arr[5],
-            arr[6], arr[7], arr[8])
-        .determinant()
+                for c in 0..4 {
+                    if c == col {
+                        continue;
+                    }
+
+                    out[rr][cc] = self.data[r][c];
+                    cc += 1;
+                }
+
+                rr += 1;
+            }
+
+
+        Mat3x3 {
+            data: out
+        }.determinant()
     }
 
-    pub fn cofactor(&self, r : u32, c : u32) -> f32 {
+    pub fn cofactor(&self, r : usize, c : usize) -> f32 {
         // (-1.0) ^ (row + col)
         let sign = if (r + c) % 2 == 0 { 1.0 } else { -1.0 };
 
@@ -126,7 +131,7 @@ impl Mat4x4 {
         let mut cofactor = Self::identity();
         for i in 0..4 {
             for j in 0..4{
-                cofactor.data[i][j] = self.cofactor(i as u32, j as u32);
+                cofactor.data[i][j] = self.cofactor(i , j);
             }
         }
 

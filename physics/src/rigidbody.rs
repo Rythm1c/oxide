@@ -123,7 +123,7 @@ impl RigidBody {
         let dq = if angle > 1e-8 {
             Quat::from_radians(angle, d_angle)
         } else {
-            Quat::ZERO
+            Quat::identity()
         };
 
         self.orientation = (dq * self.orientation).normalize();
@@ -150,7 +150,7 @@ impl RigidBodyBuilder {
             restitution:      0.5,
             friction:         0.5,
             position:         Vec3::ZERO,
-            orientation:      Quat::ZERO,
+            orientation:      Quat::identity(),
             velocity:         Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
         }
