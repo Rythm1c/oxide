@@ -60,9 +60,8 @@ impl Mat3x3{
     }
 
     pub fn cofactor(&self, r: u32, c: u32) -> f32 {
-        // +1 because we start with index 0
-        let power: u32 = r + 1 + c + 1;
-        let sign = (-1i32).pow(power) as f32;
+        // (-1.0) ^ (row + col)
+        let sign = if (r + c) % 2 == 0 {1.0} else {-1.0};
 
         sign * self.minor(r, c)
     }
@@ -88,10 +87,10 @@ impl Mat3x3{
         cofactor.transpose()
     }
 
-    pub fn inverse(self) -> Self {
+    pub fn inverse(&self) -> Self {
         let det = self.determinant();
 
-        if det == 0.0 {
+        if det.abs() < f32::EPSILON {
             return Self::identity();
         }
         let adj = self.adjugate();
@@ -209,17 +208,17 @@ impl Mul<Vec3> for Mat3x3 {
     fn mul(self, rhs: Vec3) -> Self::Output {
         //helper function
         let rxv = |m: &[[f32; 3]; 3],v: &Vec3, r: usize|-> f32 {
-            let a = m[r][0] * v.x; 
+            let a = m[r][0] * v.x;
             let b = m[r][1] * v.y;
             let c = m[r][2] * v.z;
 
-            a + b + c 
+            a + b + c
         };
 
         Vec3 {
-        x: rxv(&self.data, &rhs, 0),
-        y: rxv(&self.data, &rhs, 1),
-        z: rxv(&self.data, &rhs, 2),
+            x: rxv(&self.data, &rhs, 0),
+            y: rxv(&self.data, &rhs, 1),
+            z: rxv(&self.data, &rhs, 2),
         }
     }
 }

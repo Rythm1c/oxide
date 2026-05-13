@@ -50,7 +50,13 @@ impl Mat2x2 {
         let d = &self.data;
         let det = self.determinant();
 
-        (1.0 / det ) * Self::new(d[1][1], -d[0][1], -d[1][0], d[0][0])
+        if det.abs() < f32::EPSILON  {
+            return Self::identity();
+        }
+
+        (1.0 / det ) * Self::new(
+             d[1][1], -d[0][1],
+            -d[1][0],  d[0][0])
     }
 
 }

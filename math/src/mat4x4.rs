@@ -105,9 +105,8 @@ impl Mat4x4 {
     }
 
     pub fn cofactor(&self, r : u32, c : u32) -> f32 {
-        // +1 because we start with index 0
-        let power: u32 = r + 1 + c + 1;
-        let sign = (-1i32).pow(power) as f32;
+        // (-1.0) ^ (row + col)
+        let sign = if (r + c) % 2 == 0 { 1.0 } else { -1.0 };
 
         sign * self.minor(r, c)
     }
@@ -134,10 +133,10 @@ impl Mat4x4 {
         cofactor.transpose()
     }
 
-    pub fn inverse(self) -> Self {
+    pub fn inverse(&self) -> Self {
         let det = self.determinant();
 
-        if det == 0.0 {
+        if det.abs() < f32::EPSILON  {
             return Self::identity();
         }
         let adj = self.adjugate();
