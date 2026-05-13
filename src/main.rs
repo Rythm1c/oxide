@@ -77,7 +77,7 @@ fn main() -> anyhow::Result<()> {
         },
         RigidBodyBuilder::new(Collider::Sphere(SphereCollider::new(1000.0)))
             .position(Vec3::new(0.0, -1002.0, 0.0))
-            .mass(f32::INFINITY)
+            .mass(f32::INFINITY) // static objects have infinite mass
             .restitution(1.0)
             .build(),
     );
