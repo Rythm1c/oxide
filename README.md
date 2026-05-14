@@ -28,6 +28,7 @@ you should see a sample scene
 - https://vulkan-tutorial.com
 - https://www.songho.ca/
 - https://learnopengl.com/
+- [game physics in one weekend series - Gregory Hodges](https://gamephysicsweekend.github.io/)
 ### Text/Books
 - gabor szauer - hands on c++ game animation programming pack 
 - Ian Millington - GAME PHYSICS ENGINE DEVELOPMENT(second edition)
@@ -36,15 +37,18 @@ you should see a sample scene
 - [x] FPS style camera
 - [x] directional lighting
 - [x] Physical based rendering
-- [ ] Multiple point lights
 - [x] shadow-map(PCF)
+- [x] Rigid-body physics(work in progress)
+- [ ] soft body physics
+- [ ] Multiple point lights
 - [ ] GUI
 - [ ] screen capture
 - [ ] sky box
 - [ ] transparency
-- [ ] Rigid-body physics(work in progress)
 - [ ] 3D model support
 - [ ] animations
+
+
 
 
 ## samples
