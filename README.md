@@ -1,4 +1,4 @@
-# OXIDE
+# PHOBOS
 
 A 3D renderer that uses the vulkan api 
 Nothing too fancy. Just a hobby project i've been working on in my spare time for my love of computer graphics.
